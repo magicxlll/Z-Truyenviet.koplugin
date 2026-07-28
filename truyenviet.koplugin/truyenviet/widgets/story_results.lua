@@ -166,6 +166,7 @@ local StoryResults = InputContainer:extend{
     on_return_callback = nil,
     search_callback = nil,
     genres_callback = nil,
+    filter_callback = nil,
     server_page = nil,
     server_total_pages = nil,
     server_prev_callback = nil,
@@ -202,10 +203,12 @@ function StoryResults:init()
         local genre_width = math.floor(self.width * 2 / 5)
         local control_width = math.floor((self.width - genre_width) / 3)
         self.genre_button = Button:new{
-            text = "Thể loại",
+            text = self.filter_callback and "Lọc & Thể loại" or "Thể loại",
             width = genre_width,
             callback = function()
-                if self.genres_callback then
+                if self.filter_callback then
+                    self.filter_callback()
+                elseif self.genres_callback then
                     self.genres_callback()
                 end
             end,

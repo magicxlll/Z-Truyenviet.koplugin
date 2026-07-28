@@ -143,4 +143,45 @@ function CredentialManager:removeCredential(source_id)
     return true
 end
 
+local DEFAULT_FIRECRAWL_KEY = "fc-8d74d9b08d5a4677b6c715834d4e8cec"
+
+function CredentialManager:saveFirecrawlKey(key)
+    Storage:initialize()
+    if not key or key == "" then
+        return Storage.settings:saveSetting("firecrawl_api_key", nil)
+    end
+    local encrypted, err = self:encrypt(key)
+    if not encrypted then
+        return nil, err or "Không thể mã hóa API Key"
+    end
+    Storage.settings:saveSetting("firecrawl_api_key", encrypted)
+    Storage.settings:flush()
+    return true
+end
+
+function CredentialManager:getFirecrawlKey()
+    Storage:initialize()
+    local encrypted = Storage.settings:readSetting("firecrawl_api_key")
+    if not encrypted or type(encrypted) ~= "string" or encrypted == "" then
+        return DEFAULT_FIRECRAWL_KEY
+    end
+    local key = self:decrypt(encrypted)
+    return (key and key ~= "") and key or DEFAULT_FIRECRAWL_KEY
+end
+
+function CredentialManager:getMaskedFirecrawlKey()
+    local key = self:getFirecrawlKey()
+    if not key or key == "" then
+        return "Chưa cài đặt"
+    end
+    if key == DEFAULT_FIRECRAWL_KEY then
+        return "Hệ thống tích hợp (" .. key:sub(1, 7) .. "..." .. key:sub(-4) .. ")"
+    end
+    if #key > 10 then
+        return key:sub(1, 7) .. "..." .. key:sub(-4)
+    end
+    return "******"
+end
+
 return CredentialManager
+

@@ -101,6 +101,17 @@ function Storage:setCustomBaseUrl(source_id, url)
     return persistSetting(self, "custom_url_" .. source_id, url)
 end
 
+function Storage:getSourceOrder()
+    self:initialize()
+    local order = self.settings:readSetting("source_order")
+    return type(order) == "table" and order or {}
+end
+
+function Storage:setSourceOrder(order)
+    self:initialize()
+    return persistSetting(self, "source_order", order)
+end
+
 function Storage:setFastMode(enabled)
     self:initialize()
     return persistSetting(self, "fast_mode", enabled == true)
@@ -379,26 +390,271 @@ function Storage:isEbookDownloaded(source, book, filename)
     return lfs.attributes(path, "mode") == "file", path
 end
 
-function Storage:listEbookFiles(source, book)
-    local dir = self:getEbookDir(source, book)
-    local files = {}
-    local ok = pcall(function()
+function Storage:isPrefetchEnabled()
+    self:initialize()
+    return self.settings:readSetting("prefetch_enabled", true) == true
+end
+
+function Storage:setPrefetchEnabled(enabled)
+    self:initialize()
+    return persistSetting(self, "prefetch_enabled", enabled == true)
+end
+
+function Storage:getPrefetchCount()
+    self:initialize()
+    return tonumber(self.settings:readSetting("prefetch_count", 3)) or 3
+end
+
+function Storage:setPrefetchCount(count)
+    self:initialize()
+    return persistSetting(self, "prefetch_count", tonumber(count) or 3)
+end
+
+function Storage:isAutoPurgeEnabled()
+    self:initialize()
+    return self.settings:readSetting("auto_purge_enabled", true) == true
+end
+
+function Storage:setAutoPurgeEnabled(enabled)
+    self:initialize()
+    return persistSetting(self, "auto_purge_enabled", enabled == true)
+end
+
+function Storage:getPurgeDistance()
+    self:initialize()
+    return tonumber(self.settings:readSetting("purge_distance", 5)) or 5
+end
+
+function Storage:setPurgeDistance(distance)
+    self:initialize()
+    return persistSetting(self, "purge_distance", tonumber(distance) or 5)
+end
+
+-- Quản lý File Đã Tải (Downloaded Files Management)
+
+function Storage:listDownloadedStories()
+    self:initialize()
+    local result = {}
+    local path = self.root_dir
+    if lfs.attributes(path, "mode") ~= "directory" then return result end
+
+    for source_id in lfs.dir(path) do
+        if source_id ~= "." and source_id ~= ".." and source_id ~= "cache" and source_id ~= "custom_sources" then
+            local source_dir = ffiutil.joinPath(path, source_id)
+            if lfs.attributes(source_dir, "mode") == "directory" then
+                for story_slug in lfs.dir(source_dir) do
+                    if story_slug ~= "." and story_slug ~= ".." then
+                        local story_dir = ffiutil.joinPath(source_dir, story_slug)
+                        if lfs.attributes(story_dir, "mode") == "directory" then
+                            local chapter_count = 0
+                            local total_bytes = 0
+                            for file in lfs.dir(story_dir) do
+                                if file ~= "." and file ~= ".." and not file:find("%.part$") then
+                                    local fp = ffiutil.joinPath(story_dir, file)
+                                    local attr = lfs.attributes(fp)
+                                    if attr and attr.mode == "file" then
+                                        chapter_count = chapter_count + 1
+                                        total_bytes = total_bytes + (attr.size or 0)
+                                    end
+                                end
+                            end
+                            if chapter_count > 0 then
+                                table.insert(result, {
+                                    source_id = source_id,
+                                    story_slug = story_slug,
+                                    dir_path = story_dir,
+                                    chapter_count = chapter_count,
+                                    total_bytes = total_bytes,
+                                })
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return result
+end
+
+function Storage:listDownloadedChapters(source, story)
+    local dir = self:getStoryDir(source, story)
+    local chapters = {}
+    if lfs.attributes(dir, "mode") == "directory" then
         for file in lfs.dir(dir) do
-            if file ~= "." and file ~= ".." then
-                local path = ffiutil.joinPath(dir, file)
-                local attr = lfs.attributes(path)
-                if attr and attr.mode == "file" then
-                    table.insert(files, {
-                        name = file,
-                        path = path,
-                        size = attr.size,
+            if file ~= "." and file ~= ".." and not file:find("%.part$") then
+                local lower_f = file:lower()
+                if (lower_f:find("%.html$") or lower_f:find("%.htm$") or lower_f:find("%.txt$")) and not lower_f:find("^cover%.") then
+                    local fp = ffiutil.joinPath(dir, file)
+                    local attr = lfs.attributes(fp)
+                    if attr and attr.mode == "file" then
+                        table.insert(chapters, {
+                            filename = file,
+                            path = fp,
+                            size = attr.size,
+                        })
+                    end
+                end
+            end
+        end
+    end
+    table.sort(chapters, function(a, b) return a.filename < b.filename end)
+    return chapters
+end
+
+function Storage:deleteChapters(source, story, chapter_filenames)
+    local dir = self:getStoryDir(source, story)
+    local count = 0
+    for _, fname in ipairs(chapter_filenames or {}) do
+        local fp = ffiutil.joinPath(dir, fname)
+        if lfs.attributes(fp, "mode") == "file" then
+            if os.remove(fp) then
+                count = count + 1
+            end
+        end
+    end
+    return count
+end
+
+function Storage:mergeChaptersToEpub(source, story, output_path)
+    local ok, res, err_msg, chapters = pcall(function()
+        local dir = self:getStoryDir(source, story)
+        local chapters = self:listDownloadedChapters(source, story)
+        if #chapters == 0 then
+            return nil, "Không có chương nào để gộp"
+        end
+
+        output_path = output_path or ffiutil.joinPath(self:getRootDir(), Util.safeName(story.title or story.url, "story") .. "_merged.epub")
+        local out_file, err = io.open(output_path, "w")
+        if not out_file then
+            return nil, "Không thể tạo file gộp: " .. tostring(err)
+        end
+
+        -- Tìm ảnh bìa trong cache hoặc thư mục truyện
+        local cover_b64 = nil
+        local cover_mime = "image/jpeg"
+        local cover_path = nil
+
+        pcall(function()
+            local CoverCache = require("truyenviet/cover_cache")
+            cover_path = CoverCache:get(story)
+        end)
+
+        if not cover_path and lfs.attributes(dir, "mode") == "directory" then
+            for _, ext in ipairs({"jpg", "png", "webp", "jpeg"}) do
+                local p = ffiutil.joinPath(dir, "cover." .. ext)
+                if lfs.attributes(p, "mode") == "file" then
+                    cover_path = p
+                    break
+                end
+            end
+        end
+
+        if cover_path then
+            local img_f = io.open(cover_path, "rb")
+            if img_f then
+                local data = img_f:read("*a")
+                img_f:close()
+                if data and #data > 0 then
+                    local ok_mime, mime = pcall(require, "mime")
+                    if ok_mime and mime and type(mime.b64) == "function" then
+                        local ok_b64, b64_res = pcall(mime.b64, data)
+                        if ok_b64 and b64_res then
+                            cover_b64 = b64_res
+                            if cover_path:find("%.png$") then
+                                cover_mime = "image/png"
+                            elseif cover_path:find("%.webp$") then
+                                cover_mime = "image/webp"
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Bóc tách danh sách tiêu đề & nội dung các chương
+        local chapter_data = {}
+        for i, chap in ipairs(chapters) do
+            local f = io.open(chap.path, "r")
+            if f then
+                local content = f:read("*a")
+                f:close()
+                if content then
+                    local title = content:match("<title>(.-)</title>")
+                        or content:match("<h[12][^>]*>(.-)</h[12]>")
+                        or chap.filename:gsub("%.html$", ""):gsub("^%d+_%d+_", "")
+                    title = Util.decodeHtml(Util.stripTags(title or ""))
+                    if title == "" then
+                        title = "Chương " .. i
+                    end
+
+                    local body = content:match("<body[^>]*>([%s%S]-)</body>") or content
+                    table.insert(chapter_data, {
+                        index = i,
+                        title = title,
+                        body = body,
+                        path = chap.path,
                     })
                 end
             end
         end
+
+        -- Viết Header HTML & CSS
+        out_file:write("<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n")
+        out_file:write("<title>" .. Util.encodeHtml(story.title or "Truyện") .. "</title>\n")
+        out_file:write("<style>\n")
+        out_file:write("  body { font-family: sans-serif; margin: 0; padding: 20px; line-height: 1.6; }\n")
+        out_file:write("  .cover-box { text-align: center; page-break-after: always; padding: 20px 0; }\n")
+        out_file:write("  .cover-box img { max-width: 100%; max-height: 85vh; height: auto; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }\n")
+        out_file:write("  .story-main-title { text-align: center; margin-top: 15px; font-size: 2em; }\n")
+        out_file:write("  .toc-box { page-break-after: always; padding: 10px 0; }\n")
+        out_file:write("  .toc-title { text-align: center; border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 20px; font-size: 1.6em; }\n")
+        out_file:write("  .toc-list { list-style-type: none; padding-left: 0; line-height: 2.2; }\n")
+        out_file:write("  .toc-item { border-bottom: 1px dashed #ddd; padding: 6px 0; }\n")
+        out_file:write("  .toc-item a { text-decoration: none; color: #1a0dab; font-size: 1.1em; display: block; }\n")
+        out_file:write("  .chapter-block { page-break-before: always; padding-top: 15px; }\n")
+        out_file:write("</style>\n</head>\n<body>\n")
+
+        -- 1. TRANG BÌA (COVER PAGE)
+        if cover_b64 then
+            out_file:write("<div class=\"cover-box\">\n")
+            out_file:write("  <img src=\"data:" .. cover_mime .. ";base64," .. cover_b64 .. "\" alt=\"Cover\" />\n")
+            out_file:write("  <h1 class=\"story-main-title\">" .. Util.encodeHtml(story.title or "Truyện") .. "</h1>\n")
+            out_file:write("</div>\n")
+        else
+            out_file:write("<div class=\"cover-box\">\n")
+            out_file:write("  <h1 class=\"story-main-title\">" .. Util.encodeHtml(story.title or "Truyện") .. "</h1>\n")
+            out_file:write("</div>\n")
+        end
+
+        -- 2. MỤC LỤC TRUYỆN (TABLE OF CONTENTS) AT FRONT
+        out_file:write("<div class=\"toc-box\">\n")
+        out_file:write("  <h2 class=\"toc-title\">MỤC LỤC TRUYỆN</h2>\n")
+        out_file:write("  <ul class=\"toc-list\">\n")
+        for _, item in ipairs(chapter_data) do
+            out_file:write("    <li class=\"toc-item\"><a href=\"#chap_" .. item.index .. "\">" .. Util.encodeHtml(item.title) .. "</a></li>\n")
+        end
+        out_file:write("  </ul>\n")
+        out_file:write("</div>\n")
+
+        -- 3. NỘI DUNG CÁC CHƯƠNG TRUYỆN
+        for _, item in ipairs(chapter_data) do
+            out_file:write("<div id=\"chap_" .. item.index .. "\" class=\"chapter-block\">\n")
+            out_file:write(item.body .. "\n")
+            out_file:write("</div>\n")
+        end
+
+        out_file:write("</body>\n</html>\n")
+        out_file:close()
+        return output_path, nil, chapters
     end)
-    return files
+
+    if ok then
+        return res, err_msg, chapters
+    else
+        return nil, tostring(res)
+    end
 end
 
 return Storage
+
 

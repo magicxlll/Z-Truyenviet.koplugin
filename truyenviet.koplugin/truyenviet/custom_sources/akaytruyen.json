@@ -1,0 +1,35 @@
+{
+  "id": "akaytruyen",
+  "name": "AkayTruyen",
+  "kind": "text",
+  "base_url": "https://akaytruyen.com",
+  "headers": {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Referer": "https://akaytruyen.com/"
+  },
+  "completed": {
+    "path": "/"
+  },
+  "search": {
+    "path": "/tim-kiem/?tukhoa={query}",
+    "story_block_pattern": "<a[^>]+href=[\"'](https?://akaytruyen\\.com/truyen/[^\"']+)[\"'][^>]*>([%s%S]-)</a>",
+    "title_pattern": "title=[\"']([^\"']+)[\"']",
+    "url_pattern": "href=[\"']([^\"']+)[\"']",
+    "cover_pattern": "data%-src=[\"']([^\"']+)[\"']"
+  },
+  "story_details": {
+    "description_pattern": "<div[^>]-class=[\"'][^\"']*desc[^\"']*[\"'][^>]*>([%s%S]-)</div>",
+    "author_pattern": "itemprop=[\"']author[\"'][^>]*>([%s%S]-)</a>",
+    "status_pattern": "<span[^>]-class=[\"'][^\"']*text%-success[^\"']*[\"'][^>]*>([%s%S]-)</span>"
+  },
+  "story_page": {
+    "chapter_item_pattern": "<a[^>]+href=[\"']([^\"']*/chuong[^\"']*)[\"'][^>]*>([%s%S]-)</a>",
+    "total_pages_pattern": "id=[\"']total%-page[\"'][^>]-value=[\"'](%d+)[\"']"
+  },
+  "chapter": {
+    "title_pattern": "<h[12][^>]*>([%s%S]-)</h[12]>",
+    "content_pattern": "<div[^>]-id=[\"']chapter%-content[\"'][^>]*>([%s%S]-)</div>",
+    "prev_url_pattern": "id=[\"']prev_chap[\"'][^>]+href=[\"']([^\"']+)[\"']",
+    "next_url_pattern": "id=[\"']next_chap[\"'][^>]+href=[\"']([^\"']+)[\"']"
+  }
+}

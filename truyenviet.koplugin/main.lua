@@ -14,26 +14,94 @@ local TruyenViet = WidgetContainer:extend{
 function TruyenViet:init()
     if self.ui.name == "ReaderUI" then
         Reader:initializeFromReaderUI(self.ui)
-    else
+    end
+
+    if self.ui.menu then
         self.ui.menu:registerToMainMenu(self)
     end
+
+    local UIManager = require("ui/uimanager")
+    UIManager:nextTick(function()
+        if self.ui.title_bar and not self._topbar_button_added then
+            self._topbar_button_added = true
+            if type(self.ui.title_bar.addButton) == "function" then
+                self.ui.title_bar:addButton({
+                    icon = "book",
+                    title = "Truyện Việt v" .. Version,
+                    callback = function()
+                        Browser:showRoot()
+                    end,
+                })
+            end
+        end
+    end)
 
     Dispatcher:registerAction("start_truyenviet", {
         category = "none",
         event = "StartTruyenViet",
-        title = "Truyện Việt",
+        title = "Truyện Việt v" .. Version,
         general = true,
     })
 end
 
 function TruyenViet:addToMainMenu(menu_items)
-    menu_items.truyenviet = {
-        text = "Truyện Việt",
-        sorting_hint = "search",
-        callback = function()
+    local function openTruyenViet()
+        Browser:showRoot()
+    end
+    local function openContinue()
+        local Storage = require("truyenviet/storage")
+        local SourceRegistry = require("truyenviet/source_registry")
+        local history = Storage:getHistory()
+        if #history > 0 then
+            local latest = history[1]
+            local src = SourceRegistry:get(latest.story.source_id)
+            if src then
+                Browser:loadStoryPage(latest.story, src, 1, function()
+                    Browser:showRoot()
+                end)
+            else
+                Browser:showHistory(function() Browser:showRoot() end)
+            end
+        else
             Browser:showRoot()
-        end,
-    }
+        end
+    end
+
+    local title_text = "🔥 Truyện Việt v" .. Version
+
+    if self.ui and self.ui.name == "ReaderUI" then
+        menu_items.truyenviet_reader_tools = {
+            text = title_text,
+            sorting_hint = "tools_settings",
+            callback = openTruyenViet,
+        }
+    else
+        menu_items.truyenviet_search = {
+            text = title_text,
+            sorting_hint = "search",
+            callback = openTruyenViet,
+        }
+        menu_items.truyenviet_tools = {
+            text = title_text,
+            sorting_hint = "tools",
+            callback = openTruyenViet,
+        }
+        menu_items.truyenviet_main = {
+            text = title_text,
+            sorting_hint = "main",
+            callback = openTruyenViet,
+        }
+        menu_items.truyenviet_continue_search = {
+            text = "📖 Truyện Việt: Tiếp tục đọc",
+            sorting_hint = "search",
+            callback = openContinue,
+        }
+        menu_items.truyenviet_continue_tools = {
+            text = "📖 Truyện Việt: Tiếp tục đọc",
+            sorting_hint = "tools",
+            callback = openContinue,
+        }
+    end
 end
 
 function TruyenViet:onStartTruyenViet()

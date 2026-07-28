@@ -1,0 +1,34 @@
+{
+  "id": "auto_mtruyen",
+  "name": "mtruyen.net",
+  "kind": "text",
+  "base_url": "https://mtruyen.net",
+  "matched_template": "Direct Importer Auto-Detected",
+  "headers": {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Referer": "https://mtruyen.net/"
+  },
+  "search": {
+    "path": "/tim-kiem?q={query}",
+    "story_block_pattern": "<a[^>]+href=\"([^\"]*/truyen/[^\"]*)\"[^>]*>([%s%S]-)</a>",
+    "url_pattern": "href=\"([^\"]*/truyen/[^\"]*)\"",
+    "title_pattern": "<h[34][^>]*>([%s%S]-)</h[34]>",
+    "cover_pattern": "src=\"([^\"]+)\""
+  },
+  "story_details": {
+    "description_pattern": "<div[^>]-class=\"[^\"]*desc[^\"]*\"[^>]*>([%s%S]-)</div>",
+    "author_pattern": "author",
+    "status_pattern": "status"
+  },
+  "story_page": {
+    "chapter_item_pattern": "<a[^>]+href=\"([^\"]*/chuong%-[^\"]*)\"[^>]*>([%s%S]-)</a>",
+    "total_pages_pattern": "trang%-(%d+)"
+  },
+  "chapter": {
+    "title_pattern": "<h[12][^>]*>([%s%S]-)</h[12]>",
+    "content_pattern": "<div[^>]-class=\"[^\"]*chapter%-content[^\"]*\"[^>]*>(.+)</div>",
+    "prev_url_pattern": "href=\"([^\"]*/chuong%-%d+)\"[^>]*>Chương trước",
+    "next_url_pattern": "href=\"([^\"]*/chuong%-%d+)\"[^>]*>Chương sau"
+  }
+}

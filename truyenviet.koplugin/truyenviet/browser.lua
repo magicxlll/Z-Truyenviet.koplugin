@@ -369,20 +369,42 @@ function Browser:showRoot()
     Storage:initialize()
 
     local view
-    local items = {
-        {
-            text = "Tìm trên tất cả nguồn",
-            mandatory_func = function()
-                return tostring(#SourceRegistry:listEnabled())
-            end,
+    local items = {}
+
+    local history = Storage:getHistory()
+    if #history > 0 then
+        local latest = history[1]
+        table.insert(items, {
+            text = "📖 Tiếp tục: " .. latest.story.title,
+            mandatory = latest.chapter.title,
             callback = function()
-                self:showSearchDialog(nil, function()
-                    self:showRoot()
-                end, view)
-                return true
+                closeAndRun(view, function()
+                    local src = SourceRegistry:get(latest.story.source_id)
+                    if src then
+                        self:loadStoryPage(latest.story, src, 1, function()
+                            self:showRoot()
+                        end)
+                    else
+                        self:showHistory(function() self:showRoot() end)
+                    end
+                end)
             end,
-        },
-    }
+        })
+    end
+
+    table.insert(items, {
+        text = "Tìm trên tất cả nguồn",
+        mandatory_func = function()
+            return tostring(#SourceRegistry:listEnabled())
+        end,
+        callback = function()
+            self:showSearchDialog(nil, function()
+                self:showRoot()
+            end, view)
+            return true
+        end,
+    })
+
     table.insert(items, {
         text = "Đọc truyện",
         mandatory_func = function()
@@ -417,6 +439,36 @@ function Browser:showRoot()
             callback = function()
                 closeAndRun(view, function()
                     self:showFavorites(function()
+                        self:showRoot()
+                    end)
+                end)
+            end,
+        })
+        table.insert(items, {
+            text = "🌐 Dán URL Web Truyện để Tự Tạo Nguồn",
+            callback = function()
+                closeAndRun(view, function()
+                    self:showDirectImporterDialog(function()
+                        self:showRoot()
+                    end)
+                end)
+            end,
+        })
+        table.insert(items, {
+            text = "📦 Quản lý File Đã Tải & Gộp File",
+            callback = function()
+                closeAndRun(view, function()
+                    self:showDownloadedManager(function()
+                        self:showRoot()
+                    end)
+                end)
+            end,
+        })
+        table.insert(items, {
+            text = "⚙️ Cài đặt Tải ngầm & Purge",
+            callback = function()
+                closeAndRun(view, function()
+                    self:showAdvancedSettings(function()
                         self:showRoot()
                     end)
                 end)
@@ -667,7 +719,81 @@ function Browser:showRoot()
                 })
             end,
         })
-    view = showView("Truyện Việt", items)
+    view = showView("Truyện Việt v" .. Version, items)
+end
+
+function Browser:showSourceSectionsMenu(source, on_return_callback)
+    local view
+    local items = {
+        {
+            text = "🔥 Truyện Hot / Đề Cử",
+            callback = function()
+                closeAndRun(view, function()
+                    self:browseSource(source, { section = "hot", name = "Truyện Hot / Đề Cử" }, 1, function()
+                        self:showSourceSectionsMenu(source, on_return_callback)
+                    end)
+                end)
+            end,
+        },
+        {
+            text = "✅ Truyện Hoàn Thành (Full)",
+            callback = function()
+                closeAndRun(view, function()
+                    self:browseSource(source, { section = "completed", name = "Truyện đã hoàn thành" }, 1, function()
+                        self:showSourceSectionsMenu(source, on_return_callback)
+                    end)
+                end)
+            end,
+        },
+        {
+            text = "🆕 Truyện Đang Ra / Cập Nhật Mới",
+            callback = function()
+                closeAndRun(view, function()
+                    self:browseSource(source, { section = "updating", name = "Truyện mới cập nhật" }, 1, function()
+                        self:showSourceSectionsMenu(source, on_return_callback)
+                    end)
+                end)
+            end,
+        },
+        {
+            text = "📚 Tất Cả Thể Loại",
+            callback = function()
+                closeAndRun(view, function()
+                    runOnline(function()
+                        local genres, err = withLoading("Đang tải danh sách thể loại...", function()
+                            if source.getGenresList then
+                                local list = source:getGenresList()
+                                if list and #list > 0 then return list end
+                            end
+                            local res = source:getCompleted(1)
+                            return res and res.genres or {}
+                        end)
+                        if not genres or #genres == 0 then
+                            showError(err or "Không đọc được danh sách thể loại từ nguồn này.", function()
+                                self:showSourceSectionsMenu(source, on_return_callback)
+                            end)
+                            return
+                        end
+                        self:showGenreMenu(source, genres, function()
+                            self:showSourceSectionsMenu(source, on_return_callback)
+                        end)
+                    end)
+                end)
+            end,
+        },
+        {
+            text = "🔍 Tìm Kiếm Trên " .. source.name,
+            callback = function()
+                closeAndRun(view, function()
+                    self:showSearchDialog(source, function()
+                        self:showSourceSectionsMenu(source, on_return_callback)
+                    end)
+                end)
+            end,
+        },
+    }
+
+    view = showView(source.name .. " · Phân loại", items, on_return_callback)
 end
 
 function Browser:showSourceMenu(on_return_callback)
@@ -704,7 +830,7 @@ function Browser:showSourceMenu(on_return_callback)
                             self:showSourceMenu(on_return_callback)
                         end)
                     else
-                        self:browseSource(current_source, nil, 1, function()
+                        self:showSourceSectionsMenu(current_source, function()
                             self:showSourceMenu(on_return_callback)
                         end)
                     end
@@ -832,7 +958,21 @@ function Browser:browseSource(source, genre, local_page, on_return_callback)
                 ),
                 function()
                     local r, e
-                    if genre then
+                    if genre and genre.section == "hot" then
+                        if source.getHot then
+                            r, e = source:getHot(server_page)
+                        else
+                            r, e = source:getCompleted(server_page)
+                        end
+                    elseif genre and genre.section == "updating" then
+                        if source.getUpdating then
+                            r, e = source:getUpdating(server_page)
+                        else
+                            r, e = source:getCompleted(server_page)
+                        end
+                    elseif genre and genre.section == "completed" then
+                        r, e = source:getCompleted(server_page)
+                    elseif genre and genre.url then
                         r, e = source:getGenre(genre, server_page)
                     else
                         r, e = source:getCompleted(server_page)
@@ -964,6 +1104,113 @@ function Browser:showGenreMenu(source, genres, on_return_callback)
     view = showView(source.name .. " · Thể loại", items, on_return_callback)
 end
 
+function Browser:showSmartFilterDialog(stories, current_title, on_return_callback, options)
+    options = options or {}
+    local ButtonDialog = require("ui/widget/buttondialog")
+    local InputDialog = require("ui/widget/inputdialog")
+    local dialog
+
+    dialog = ButtonDialog:new{
+        title = "⚡ Bộ lọc thông minh",
+        description = string.format("Danh sách hiện tại: %d truyện\nChọn phương thức lọc:", #stories),
+        buttons = {
+            {
+                {
+                    text = "🔤 Lọc theo từ khóa (Không dấu)",
+                    callback = function()
+                        UIManager:close(dialog)
+                        local input_dialog
+                        input_dialog = InputDialog:new{
+                            title = "Lọc theo từ khóa",
+                            description = "Nhập từ cần tìm (VD: 'phong', 'thien', 'full'):",
+                            buttons = {
+                                {
+                                    {
+                                        text = "Hủy",
+                                        callback = function()
+                                            UIManager:close(input_dialog)
+                                        end,
+                                    },
+                                    {
+                                        text = "Lọc ngay",
+                                        is_default = true,
+                                        callback = function()
+                                            local keyword = input_dialog:getInputText()
+                                            UIManager:close(input_dialog)
+                                            if keyword and keyword ~= "" then
+                                                local filtered = {}
+                                                local norm_k = Util.normalizeSearch(keyword)
+                                                for _, st in ipairs(stories) do
+                                                    local norm_t = Util.normalizeSearch(st.title)
+                                                    if norm_t:find(norm_k, 1, true) then
+                                                        table.insert(filtered, st)
+                                                    end
+                                                end
+                                                self:showStories(
+                                                    current_title .. " [" .. keyword .. "]",
+                                                    filtered,
+                                                    on_return_callback,
+                                                    options
+                                                )
+                                            end
+                                        end,
+                                    },
+                                }
+                            }
+                        }
+                        UIManager:show(input_dialog)
+                    end,
+                },
+            },
+            {
+                {
+                    text = "🔀 Sắp xếp tên A -> Z",
+                    callback = function()
+                        UIManager:close(dialog)
+                        local sorted = {}
+                        for _, st in ipairs(stories) do table.insert(sorted, st) end
+                        table.sort(sorted, function(a, b)
+                            return Util.normalizeSearch(a.title) < Util.normalizeSearch(b.title)
+                        end)
+                        self:showStories(
+                            current_title .. " [A-Z]",
+                            sorted,
+                            on_return_callback,
+                            options
+                        )
+                    end,
+                },
+                {
+                    text = "🔀 Sắp xếp tên Z -> A",
+                    callback = function()
+                        UIManager:close(dialog)
+                        local sorted = {}
+                        for _, st in ipairs(stories) do table.insert(sorted, st) end
+                        table.sort(sorted, function(a, b)
+                            return Util.normalizeSearch(a.title) > Util.normalizeSearch(b.title)
+                        end)
+                        self:showStories(
+                            current_title .. " [Z-A]",
+                            sorted,
+                            on_return_callback,
+                            options
+                        )
+                    end,
+                },
+            },
+            {
+                {
+                    text = "Quay lại danh sách",
+                    callback = function()
+                        UIManager:close(dialog)
+                    end,
+                }
+            }
+        }
+    }
+    UIManager:show(dialog)
+end
+
 function Browser:showStories(title, stories, on_return_callback, options)
     options = options or {}
     if #stories == 0 then
@@ -1007,6 +1254,9 @@ function Browser:showStories(title, stories, on_return_callback, options)
                 end)
             end)
         end or nil,
+        filter_callback = function()
+            self:showSmartFilterDialog(stories, title, on_return_callback, options)
+        end,
         server_page = options.server_page,
         server_total_pages = options.server_total_pages,
         server_prev_callback = options.on_prev_page and function()
@@ -1163,84 +1413,274 @@ end
 
 function Browser:showSourceManager(on_return_callback)
     local view
-    local items = {}
+    local items = {
+        {
+            text = "⚙️ TÙY CHỌN BẬT / TẮT / RESET HÀNG LOẠT",
+            mandatory_func = function() return "Công cụ" end,
+            callback = function()
+                closeAndRun(view, function()
+                    local ButtonDialog = require("ui/widget/buttondialog")
+                    local bulk_dialog
+                    bulk_dialog = ButtonDialog:new{
+                        title = "Quản lý Hàng loạt Nguồn",
+                        description = "Chọn thao tác áp dụng cho tất cả nguồn:",
+                        buttons = {
+                            {
+                                {
+                                    text = "⚡ Bật tất cả các nguồn",
+                                    callback = function()
+                                        SourceRegistry:enableAll()
+                                        UIManager:close(bulk_dialog)
+                                        self:showSourceManager(on_return_callback)
+                                    end,
+                                },
+                                {
+                                    text = "⏸️ Tắt tất cả các nguồn",
+                                    callback = function()
+                                        SourceRegistry:disableAll()
+                                        UIManager:close(bulk_dialog)
+                                        self:showSourceManager(on_return_callback)
+                                    end,
+                                },
+                            },
+                            {
+                                {
+                                    text = "🔄 Đặt lại tất cả Domain mặc định",
+                                    callback = function()
+                                        SourceRegistry:resetAllDomains()
+                                        UIManager:close(bulk_dialog)
+                                        self:showSourceManager(on_return_callback)
+                                    end,
+                                },
+                            },
+                            {
+                                {
+                                    text = "Quay lại",
+                                    callback = function()
+                                        UIManager:close(bulk_dialog)
+                                        self:showSourceManager(on_return_callback)
+                                    end,
+                                }
+                            }
+                        }
+                    }
+                    UIManager:show(bulk_dialog)
+                end)
+            end,
+        }
+    }
+
     for _, source in ipairs(SourceRegistry:listAll()) do
         local current_source = source
         table.insert(items, {
             text = current_source.name,
             mandatory_func = function()
-                local text = SourceRegistry:isEnabled(current_source.id) and "Đang bật" or "Đã tắt"
+                local is_on = SourceRegistry:isEnabled(current_source.id)
+                local status_text = is_on and "✓ Đang bật" or "✗ Đã tắt"
                 if Storage:getCustomBaseUrl(current_source.id) then
-                    text = text .. " (Tên miền tùy chỉnh)"
+                    status_text = status_text .. " (Domain mới)"
                 end
-                return text
+                if SourceRegistry:isCustomSource(current_source.id) then
+                    status_text = status_text .. " [Tùy chỉnh]"
+                else
+                    status_text = status_text .. " [Gốc]"
+                end
+                return status_text
             end,
             callback = function()
-                local ok, err = SourceRegistry:setEnabled(
-                    current_source.id,
-                    not SourceRegistry:isEnabled(current_source.id)
-                )
-                if not ok then
-                    showError(err)
-                    return
-                end
-                closeAndRun(view, function()
-                    self:showSourceManager(on_return_callback)
-                end)
+                self:showSourceActionDialog(current_source, on_return_callback, view)
             end,
             hold_callback = function()
-                closeAndRun(view, function()
-                    local InputDialog = require("ui/widget/inputdialog")
-                    local dialog
-                    dialog = InputDialog:new{
-                        title = "Đổi tên miền: " .. current_source.name,
-                        input = Storage:getCustomBaseUrl(current_source.id) or current_source.base_url,
-                        buttons = {
-                            {
-                                {
-                                    text = "Mặc định",
-                                    callback = function()
-                                        local ok, err = Storage:setCustomBaseUrl(
-                                            current_source.id,
-                                            nil
-                                        )
-                                        if not ok then
-                                            showError(err)
-                                            return
-                                        end
-                                        closeAndRun(dialog, function()
-                                            self:showSourceManager(on_return_callback)
-                                        end)
-                                    end,
-                                },
-                                {
-                                    text = "Lưu",
-                                    is_enter_default = true,
-                                    callback = function()
-                                        local new_url = dialog:getInputText()
-                                        local ok, err = Storage:setCustomBaseUrl(
-                                            current_source.id,
-                                            new_url
-                                        )
-                                        if not ok then
-                                            showError(err)
-                                            return
-                                        end
-                                        closeAndRun(dialog, function()
-                                            self:showSourceManager(on_return_callback)
-                                        end)
-                                    end,
-                                },
-                            },
-                        },
-                    }
-                    UIManager:show(dialog)
-                    dialog:onShowKeyboard()
-                end)
+                self:showSourceActionDialog(current_source, on_return_callback, view)
             end,
         })
     end
-    view = showView("Quản lý nguồn (giữ để đổi tên miền)", items, on_return_callback)
+
+    view = ListView:new{
+        title = "Quản lý Nguồn Truyện",
+        item_table = items,
+        on_return_callback = on_return_callback,
+    }
+    UIManager:show(view)
+end
+
+function Browser:showSourceActionDialog(source, on_return_callback, parent_view)
+    local ButtonDialog = require("ui/widget/buttondialog")
+    local InputDialog = require("ui/widget/inputdialog")
+    local ConfirmBox = require("ui/widget/confirmbox")
+    local TextViewer = require("ui/widget/textviewer")
+    local is_enabled = SourceRegistry:isEnabled(source.id)
+    local is_custom = SourceRegistry:isCustomSource(source.id)
+    local custom_domain = Storage:getCustomBaseUrl(source.id)
+    local current_domain = custom_domain or source.base_url or ""
+    local dlg
+
+    local function refreshSourceManager()
+        if parent_view then
+            closeAndRun(parent_view, function()
+                self:showSourceManager(on_return_callback)
+            end)
+        else
+            self:showSourceManager(on_return_callback)
+        end
+    end
+
+    local action_buttons = {
+        {
+            {
+                text = is_enabled and "⏸️ Tắt Nguồn này" or "▶️ Bật Nguồn này",
+                is_default = true,
+                callback = function()
+                    SourceRegistry:setEnabled(source.id, not is_enabled)
+                    closeAndRun(dlg, function()
+                        refreshSourceManager()
+                    end)
+                end,
+            },
+        },
+        {
+            {
+                text = "ℹ️ Xem Thông tin chi tiết Nguồn",
+                callback = function()
+                    local info_text = SourceRegistry:getSourceInfo(source.id)
+                    UIManager:show(TextViewer:new{
+                        title = "Thông tin: " .. source.name,
+                        text = info_text,
+                    })
+                end,
+            },
+        },
+        {
+            {
+                text = "🌐 Cập nhật Tên miền / URL (" .. (custom_domain and "Đã sửa" or "Mặc định") .. ")",
+                callback = function()
+                    closeAndRun(dlg, function()
+                        local dialog
+                        dialog = InputDialog:new{
+                            title = "Đổi tên miền: " .. source.name,
+                            description = "Nhập tên miền mới khi trang web thay đổi URL (vd: https://mtruyen.org):",
+                            input = current_domain,
+                            buttons = {
+                                {
+                                    {
+                                        text = "Dùng Mặc định",
+                                        callback = function()
+                                            Storage:setCustomBaseUrl(source.id, nil)
+                                            closeAndRun(dialog, function()
+                                                refreshSourceManager()
+                                            end)
+                                        end,
+                                    },
+                                    {
+                                        text = "Hủy",
+                                        callback = function()
+                                            closeAndRun(dialog, function()
+                                                self:showSourceActionDialog(source, on_return_callback, parent_view)
+                                            end)
+                                        end,
+                                    },
+                                    {
+                                        text = "Lưu Tên miền mới",
+                                        is_default = true,
+                                        callback = function()
+                                            local new_url = dialog:getInputText()
+                                            if new_url and new_url ~= "" then
+                                                if not new_url:find("^https?://") then
+                                                    new_url = "https://" .. new_url
+                                                end
+                                                Storage:setCustomBaseUrl(source.id, new_url)
+                                            end
+                                            closeAndRun(dialog, function()
+                                                refreshSourceManager()
+                                            end)
+                                        end,
+                                    },
+                                }
+                            }
+                        }
+                        UIManager:show(dialog)
+                    end)
+                end,
+            },
+        },
+        {
+            {
+                text = "⬆️ Đẩy lên trên",
+                callback = function()
+                    SourceRegistry:moveUp(source.id)
+                    closeAndRun(dlg, function()
+                        refreshSourceManager()
+                    end)
+                end,
+            },
+            {
+                text = "🔝 Lên Đầu trang",
+                callback = function()
+                    SourceRegistry:moveToTop(source.id)
+                    closeAndRun(dlg, function()
+                        refreshSourceManager()
+                    end)
+                end,
+            },
+            {
+                text = "⬇️ Đẩy xuống dưới",
+                callback = function()
+                    SourceRegistry:moveDown(source.id)
+                    closeAndRun(dlg, function()
+                        refreshSourceManager()
+                    end)
+                end,
+            },
+        },
+    }
+
+    if is_custom then
+        table.insert(action_buttons, {
+            {
+                text = "🗑️ Xóa Nguồn Tùy chỉnh này",
+                callback = function()
+                    closeAndRun(dlg, function()
+                        UIManager:show(ConfirmBox:new{
+                            text = "Bạn có chắc chắn muốn xóa nguồn tùy chỉnh '" .. source.name .. "' không?\n(Hành động này sẽ xóa file quy tắc JSON khỏi máy)",
+                            ok_text = "Xóa Nguồn",
+                            cancel_text = "Hủy",
+                            ok_callback = function()
+                                local ok, err = SourceRegistry:deleteCustomSource(source.id)
+                                if ok then
+                                    UIManager:show(InfoMessage:new{ title = "Truyện Việt", text = "Đã xóa nguồn tùy chỉnh: " .. source.name })
+                                else
+                                    showError(err or "Không thể xóa nguồn", on_return_callback)
+                                end
+                                refreshSourceManager()
+                            end,
+                            cancel_callback = function()
+                                self:showSourceActionDialog(source, on_return_callback, parent_view)
+                            end,
+                        })
+                    end)
+                end,
+            }
+        })
+    end
+
+    table.insert(action_buttons, {
+        {
+            text = "Quay lại Danh sách Nguồn",
+            callback = function()
+                UIManager:close(dlg)
+                if not parent_view then
+                    self:showSourceManager(on_return_callback)
+                end
+            end,
+        }
+    })
+
+    dlg = ButtonDialog:new{
+        title = "Quản lý: " .. source.name,
+        description = "Domain: " .. current_domain .. "\nID: " .. source.id .. (is_custom and " (Nguồn cào tự động)" or " (Nguồn gốc)"),
+        buttons = action_buttons,
+    }
+    UIManager:show(dlg)
 end
 
 function Browser:getLocalChapters(story, source)
@@ -1514,29 +1954,33 @@ function Browser:confirmDownloadChapters(view, page_data, source)
         ok_text = "Tải các chương",
         ok_callback = function()
             UIManager:scheduleIn(0, function()
-                if page_data.total_pages > 1 then
+                if page_data.total_pages > 1 or type(source.getAllChapters) == "function" then
                     runOnline(function()
                         local all_chapters = {}
                         local fetch_ok = false
                         local _, err = withLoading("Đang lấy danh sách toàn bộ chương...", function()
-                            for p = 1, page_data.total_pages do
-                                local p_data = source:getStoryPage(story, p)
-                                if p_data and p_data.chapters then
-                                    for _, c in ipairs(p_data.chapters) do
-                                        table.insert(all_chapters, c)
-                                    end
-                                else
-                                    if not p_data or not p_data.chapters or #p_data.chapters == 0 then
-                                        break
+                            if type(source.getAllChapters) == "function" then
+                                all_chapters = source:getAllChapters(story)
+                            else
+                                for p = 1, page_data.total_pages do
+                                    local p_data = source:getStoryPage(story, p)
+                                    if p_data and p_data.chapters then
+                                        for _, c in ipairs(p_data.chapters) do
+                                            table.insert(all_chapters, c)
+                                        end
+                                    else
+                                        if not p_data or not p_data.chapters or #p_data.chapters == 0 then
+                                            break
+                                        end
                                     end
                                 end
                             end
                             local Util = require("truyenviet/helpers")
-                            all_chapters = Util.uniqueBy(all_chapters, "url")
+                            all_chapters = Util.uniqueBy(all_chapters or {}, "url")
                             fetch_ok = true
                             return true
                         end)
-                        if fetch_ok then
+                        if fetch_ok and #all_chapters > 0 then
                             local pending = ChapterDownloader:listPending(source, story, all_chapters)
                             local already_downloaded = #all_chapters - #pending
                             if #pending == 0 then
@@ -1578,29 +2022,33 @@ function Browser:confirmDownloadBundle(view, page_data, source)
         ok_text = "Tải thành 1 bộ",
         ok_callback = function()
             UIManager:scheduleIn(0, function()
-                if page_data.total_pages > 1 then
+                if page_data.total_pages > 1 or type(source.getAllChapters) == "function" then
                     runOnline(function()
                         local all_chapters = {}
                         local fetch_ok = false
                         local _, err = withLoading("Đang lấy danh sách toàn bộ chương...", function()
-                            for p = 1, page_data.total_pages do
-                                local p_data = source:getStoryPage(story, p)
-                                if p_data and p_data.chapters then
-                                    for _, c in ipairs(p_data.chapters) do
-                                        table.insert(all_chapters, c)
-                                    end
-                                else
-                                    if not p_data or not p_data.chapters or #p_data.chapters == 0 then
-                                        break
+                            if type(source.getAllChapters) == "function" then
+                                all_chapters = source:getAllChapters(story)
+                            else
+                                for p = 1, page_data.total_pages do
+                                    local p_data = source:getStoryPage(story, p)
+                                    if p_data and p_data.chapters then
+                                        for _, c in ipairs(p_data.chapters) do
+                                            table.insert(all_chapters, c)
+                                        end
+                                    else
+                                        if not p_data or not p_data.chapters or #p_data.chapters == 0 then
+                                            break
+                                        end
                                     end
                                 end
                             end
                             local Util = require("truyenviet/helpers")
-                            all_chapters = Util.uniqueBy(all_chapters, "url")
+                            all_chapters = Util.uniqueBy(all_chapters or {}, "url")
                             fetch_ok = true
                             return true
                         end)
-                        if fetch_ok then
+                        if fetch_ok and #all_chapters > 0 then
                             self:downloadAsBundle(story, source, all_chapters)
                         else
                             showError(err or "Lỗi khi lấy danh sách chương")
@@ -1702,6 +2150,7 @@ end
 function Browser:showChapterList(page_data, source, on_return_callback)
     local story = page_data.story
     local view
+    local is_reversed = page_data.sort_reversed or false
     local items = {
         {
             text = Storage:isFavorite(story)
@@ -1713,6 +2162,21 @@ function Browser:showChapterList(page_data, source, on_return_callback)
                     closeAndRun(view, function()
                         self:showChapterList(page_data, source, on_return_callback)
                     end)
+                end)
+            end,
+        },
+        {
+            text = is_reversed and "Thứ tự: Mới nhất trước (Z-A)" or "Thứ tự: Chương 1 trước (A-Z)",
+            mandatory = "Đổi thứ tự",
+            callback = function()
+                page_data.sort_reversed = not is_reversed
+                local rev = {}
+                for i = #page_data.chapters, 1, -1 do
+                    table.insert(rev, page_data.chapters[i])
+                end
+                page_data.chapters = rev
+                closeAndRun(view, function()
+                    self:showChapterList(page_data, source, on_return_callback)
                 end)
             end,
         },
@@ -1734,6 +2198,7 @@ function Browser:showChapterList(page_data, source, on_return_callback)
             })
         end
     end
+
 
     if page_data.total_pages > 1 then
         table.insert(items, {
@@ -1802,6 +2267,8 @@ function Browser:openChapter(view, page_data, source, chapter, on_return_callbac
     local logger = require("logger")
     logger.info("TruyenViet: openChapter called: url=" .. tostring(chapter.url) .. ", from_reader=" .. tostring(from_reader))
     Debug.write("Browser: openChapter called: url=" .. tostring(chapter.url) .. ", from_reader=" .. tostring(from_reader))
+
+    self:triggerPrefetchAndPurge(source, story, page_data, chapter)
 
     local next_chapter
     for i, c in ipairs(page_data.chapters) do
@@ -2878,6 +3345,409 @@ function Browser:openEbookFile(file_path, on_return_callback)
             })
         end
     end
+end
+
+function Browser:triggerPrefetchAndPurge(source, story, page_data, current_chapter)
+    if not source or not story or not page_data or not page_data.chapters or not current_chapter then
+        return
+    end
+
+    local curr_idx = nil
+    for i, c in ipairs(page_data.chapters) do
+        if c.url == current_chapter.url or (c.is_local and current_chapter.is_local and c.title == current_chapter.title) then
+            curr_idx = i
+            break
+        end
+    end
+
+    if not curr_idx then return end
+
+    -- 1. Auto Purging (Xóa cuốn chiếu A - Purge Distance)
+    if Storage:isAutoPurgeEnabled() then
+        local purge_dist = Storage:getPurgeDistance()
+        local purge_target_idx = curr_idx - purge_dist
+        if purge_target_idx >= 1 then
+            for p = 1, purge_target_idx do
+                local old_chap = page_data.chapters[p]
+                if old_chap and Storage:isDownloaded(source, story, old_chap) then
+                    Storage:removeDownload(source, story, old_chap)
+                    Debug.write("[AutoPurge] Removed old chapter: " .. tostring(old_chap.title))
+                end
+            end
+        end
+    end
+
+    -- 2. Rolling Prefetching (Tải ngầm A + 1, A + 2, A + 3)
+    if Storage:isPrefetchEnabled() then
+        local prefetch_count = Storage:getPrefetchCount()
+        local prefetch_chaps = {}
+        for p = 1, prefetch_count do
+            local next_c = page_data.chapters[curr_idx + p]
+            if next_c and not Storage:isDownloaded(source, story, next_c) then
+                table.insert(prefetch_chaps, next_c)
+            end
+        end
+
+        if #prefetch_chaps > 0 then
+            UIManager:scheduleIn(1.5, function()
+                local ChapterDownloader = require("truyenviet/chapter_downloader")
+                Debug.write("[RollingPrefetch] Starting prefetch for " .. #prefetch_chaps .. " chapters")
+                local routine = coroutine.create(function()
+                    ChapterDownloader:download(source, story, prefetch_chaps)
+                end)
+                local function step()
+                    if coroutine.status(routine) ~= "dead" then
+                        local ok, err = coroutine.resume(routine)
+                        if ok then
+                            UIManager:scheduleIn(0.2, step)
+                        end
+                    end
+                end
+                step()
+            end)
+        end
+    end
+end
+
+function Browser:executeImport(url, mode, on_return)
+    local DirectImporter = require("truyenviet/direct_importer")
+    withLoading("Đang phân tích & sinh nguồn từ URL...", function()
+        DirectImporter:importFromUrl(url, mode, function(schema, err)
+            if schema then
+                UIManager:show(InfoMessage:new{
+                    title = "Thành công",
+                    text = string.format("Đã sinh thành công Nguồn mới: %s\nPhương pháp cào: %s\nFile quy tắc: custom_sources/%s.json", schema.name, schema.matched_template or "Local Engine", schema.id),
+                })
+                if on_return then on_return() end
+            else
+                showError("Thất bại: " .. tostring(err), on_return)
+            end
+        end)
+    end)
+end
+
+function Browser:showDirectImporterDialog(on_return)
+    local InputDialog = require("ui/widget/inputdialog")
+    local ButtonDialog = require("ui/widget/buttondialog")
+
+    local dialog
+    dialog = InputDialog:new{
+        title = "Tạo nguồn truyện từ URL Web",
+        description = "Nhập tên miền hoặc URL trang web truyện (vd: mtruyen.net):",
+        input = "",
+        buttons = {
+            {
+                {
+                    text = "Hủy",
+                    callback = function()
+                        UIManager:close(dialog)
+                        if on_return then on_return() end
+                    end,
+                },
+                {
+                    text = "Cào & Sinh Nguồn",
+                    is_default = true,
+                    callback = function()
+                        local url = dialog:getInputText()
+                        UIManager:close(dialog)
+                        if not url or url == "" then
+                            showError("Vui lòng nhập đường dẫn URL!", on_return)
+                            return
+                        end
+
+                        url = Util.trim(url)
+                        if not url:find("^https?://") then
+                            url = "https://" .. url
+                        end
+
+                        local choice_dialog
+                        choice_dialog = ButtonDialog:new{
+                            title = "Chọn Phương Pháp Cào Trang Web",
+                            description = "Vui lòng chọn phương thức bóc tách dữ liệu cho URL:\n" .. url,
+                            buttons = {
+                                {
+                                    {
+                                        text = "🤖 Tự động (Local Heuristic -> Firecrawl Fallback)",
+                                        is_default = true,
+                                        callback = function()
+                                            UIManager:close(choice_dialog)
+                                            self:executeImport(url, "auto", on_return)
+                                        end,
+                                    },
+                                },
+                                {
+                                    {
+                                        text = "⚡ Ép dùng Firecrawl Cloud API (Web JS/Cloudflare)",
+                                        callback = function()
+                                            UIManager:close(choice_dialog)
+                                            self:executeImport(url, "firecrawl", on_return)
+                                        end,
+                                    },
+                                },
+                                {
+                                    {
+                                        text = "🚀 Chỉ dùng Local Engine (Bóc tách HTML offline)",
+                                        callback = function()
+                                            UIManager:close(choice_dialog)
+                                            self:executeImport(url, "local", on_return)
+                                        end,
+                                    },
+                                },
+                            }
+                        }
+                        UIManager:show(choice_dialog)
+                    end,
+                },
+            }
+        }
+    }
+    UIManager:show(dialog)
+end
+
+function Browser:showFirecrawlKeyDialog(on_return)
+    local CredentialManager = require("truyenviet/credential_manager")
+    local InputDialog = require("ui/widget/inputdialog")
+    local masked_key = CredentialManager:getMaskedFirecrawlKey()
+
+    local dialog
+    dialog = InputDialog:new{
+        title = "Firecrawl.dev API Key",
+        description = "Nhập API Key Firecrawl để vượt rào cản Cloudflare / JS động khi cào nguồn web phức tạp:\nHiện tại: [" .. masked_key .. "]",
+        input = "",
+        buttons = {
+            {
+                {
+                    text = "Khôi phục Mặc định",
+                    callback = function()
+                        CredentialManager:saveFirecrawlKey(nil)
+                        UIManager:close(dialog)
+                        UIManager:show(InfoMessage:new{ title = "Truyện Việt", text = "Đã khôi phục API Key hệ thống mặc định." })
+                        if on_return then on_return() end
+                    end,
+                },
+                {
+                    text = "Hủy",
+                    callback = function()
+                        UIManager:close(dialog)
+                        if on_return then on_return() end
+                    end,
+                },
+                {
+                    text = "Lưu API Key Tùy chỉnh",
+                    is_default = true,
+                    callback = function()
+                        local key = dialog:getInputText()
+                        if key and key ~= "" then
+                            CredentialManager:saveFirecrawlKey(key)
+                            UIManager:show(InfoMessage:new{ title = "Truyện Việt", text = "Đã lưu API Key Firecrawl tùy chỉnh thành công." })
+                        end
+                        UIManager:close(dialog)
+                        if on_return then on_return() end
+                    end,
+                },
+            }
+        }
+    }
+    UIManager:show(dialog)
+end
+
+function Browser:showDownloadedManager(on_return)
+    Storage:initialize()
+    local stories = Storage:listDownloadedStories()
+
+    if #stories == 0 then
+        UIManager:show(InfoMessage:new{
+            title = "Truyện Việt",
+            text = "Chưa có file truyện nào được tải về máy.",
+        })
+        if on_return then on_return() end
+        return
+    end
+
+    local items = {}
+    for _, item in ipairs(stories) do
+        local size_mb = string.format("%.2f MB", (item.total_bytes or 0) / (1024 * 1024))
+        table.insert(items, {
+            text = string.format("[%s] %s (%d chương - %s)", item.source_id, item.story_slug, item.chapter_count, size_mb),
+            callback = function()
+                local ButtonDialog = require("ui/widget/buttondialog")
+                local sub_dialog
+                sub_dialog = ButtonDialog:new{
+                    title = item.story_slug,
+                    text = string.format("Nguồn: %s\nSố chương: %d\nDung lượng: %s", item.source_id, item.chapter_count, size_mb),
+                    buttons = {
+                        {
+                            {
+                                text = "Gộp các chương thành 1 file EPUB/HTML",
+                                callback = function()
+                                    UIManager:close(sub_dialog)
+                                    local source = { id = item.source_id }
+                                    local story = { title = item.story_slug, url = item.story_slug }
+                                    local out_path, err, chapters = Storage:mergeChaptersToEpub(source, story)
+                                    if out_path then
+                                        local ConfirmBox = require("ui/widget/confirmbox")
+                                        UIManager:show(ConfirmBox:new{
+                                            title = "Truyện Việt - Gộp File Thành Công",
+                                            text = string.format("Đã gộp thành công %d chương có Ảnh bìa & Mục lục ở đầu sách!\n\nLưu tại:\n%s\n\nBạn có muốn XÓA TẤT CẢ các file chương gốc đã gộp để tiết kiệm dung lượng không?", #(chapters or {}), tostring(out_path)),
+                                            ok_text = "Xóa các file gốc",
+                                            cancel_text = "Giữ lại file gốc",
+                                            ok_callback = function()
+                                                local lfs = require("libs/libkoreader-lfs")
+                                                for f in lfs.dir(item.dir_path) do
+                                                    if f ~= "." and f ~= ".." then
+                                                        os.remove(item.dir_path .. "/" .. f)
+                                                    end
+                                                end
+                                                lfs.rmdir(item.dir_path)
+                                                UIManager:show(InfoMessage:new{ title = "Truyện Việt", text = "Đã xóa xong các file chương gốc." })
+                                                if on_return then on_return() end
+                                            end,
+                                            cancel_callback = function()
+                                                if on_return then on_return() end
+                                            end,
+                                        })
+                                    else
+                                        showError("Lỗi gộp file: " .. tostring(err))
+                                    end
+                                end,
+                            },
+                            {
+                                text = "Xóa tất cả chương của truyện này",
+                                callback = function()
+                                    UIManager:close(sub_dialog)
+                                    local ConfirmBox = require("ui/widget/confirmbox")
+                                    UIManager:show(ConfirmBox:new{
+                                        text = "Xóa tất cả chương đã tải của " .. item.story_slug .. "?",
+                                        ok_text = "Xóa",
+                                        cancel_text = "Hủy",
+                                        ok_callback = function()
+                                            local lfs = require("libs/libkoreader-lfs")
+                                            for f in lfs.dir(item.dir_path) do
+                                                if f ~= "." and f ~= ".." then
+                                                    os.remove(item.dir_path .. "/" .. f)
+                                                end
+                                            end
+                                            lfs.rmdir(item.dir_path)
+                                            UIManager:show(InfoMessage:new{ title = "Truyện Việt", text = "Đã xóa xong." })
+                                            if on_return then on_return() end
+                                        end,
+                                    })
+                                end,
+                            },
+                        }
+                    }
+                }
+                UIManager:show(sub_dialog)
+            end,
+        })
+    end
+
+    local view = ListView:new{
+        title = "Quản lý File Đã Tải (" .. #stories .. " truyện)",
+        item_table = items,
+        on_return_callback = on_return,
+    }
+    UIManager:show(view)
+end
+
+function Browser:showAdvancedSettings(on_return)
+    Storage:initialize()
+    local items = {}
+
+    local prefetch_status = Storage:isPrefetchEnabled() and "ĐANG BẬT" or "ĐÃ TẮT"
+    table.insert(items, {
+        text = "Tự động tải ngầm chương trước (Prefetch): [" .. prefetch_status .. "]",
+        callback = function()
+            Storage:setPrefetchEnabled(not Storage:isPrefetchEnabled())
+            self:showAdvancedSettings(on_return)
+        end,
+    })
+
+    table.insert(items, {
+        text = "Số chương tải trước ngầm: [" .. Storage:getPrefetchCount() .. " chương]",
+        callback = function()
+            local InputDialog = require("ui/widget/inputdialog")
+            local dlg
+            dlg = InputDialog:new{
+                title = "Số chương tải ngầm",
+                description = "Nhập số chương muốn tự động tải ngầm (mặc định: 3):",
+                input = tostring(Storage:getPrefetchCount()),
+                buttons = {
+                    {
+                        { text = "Hủy", callback = function() UIManager:close(dlg) end },
+                        {
+                            text = "Lưu",
+                            is_default = true,
+                            callback = function()
+                                local num = tonumber(dlg:getInputText()) or 3
+                                Storage:setPrefetchCount(num)
+                                UIManager:close(dlg)
+                                self:showAdvancedSettings(on_return)
+                            end,
+                        },
+                    }
+                }
+            }
+            UIManager:show(dlg)
+        end,
+    })
+
+    local purge_status = Storage:isAutoPurgeEnabled() and "ĐANG BẬT" or "ĐÃ TẮT"
+    table.insert(items, {
+        text = "Tự động xóa chương cũ (Auto-Purge): [" .. purge_status .. "]",
+        callback = function()
+            Storage:setAutoPurgeEnabled(not Storage:isAutoPurgeEnabled())
+            self:showAdvancedSettings(on_return)
+        end,
+    })
+
+    table.insert(items, {
+        text = "Khoảng cách xóa chương cũ (Purge Distance): [" .. Storage:getPurgeDistance() .. " chương]",
+        callback = function()
+            local InputDialog = require("ui/widget/inputdialog")
+            local dlg
+            dlg = InputDialog:new{
+                title = "Khoảng cách xóa chương cũ",
+                description = "Ví dụ nhập 5: Đọc chương A sẽ tự xóa chương A-5 (mặc định: 5):",
+                input = tostring(Storage:getPurgeDistance()),
+                buttons = {
+                    {
+                        { text = "Hủy", callback = function() UIManager:close(dlg) end },
+                        {
+                            text = "Lưu",
+                            is_default = true,
+                            callback = function()
+                                local num = tonumber(dlg:getInputText()) or 5
+                                Storage:setPurgeDistance(num)
+                                UIManager:close(dlg)
+                                self:showAdvancedSettings(on_return)
+                            end,
+                        },
+                    }
+                }
+            }
+            UIManager:show(dlg)
+        end,
+    })
+
+    local CredentialManager = require("truyenviet/credential_manager")
+    local fc_key = CredentialManager:getFirecrawlKey()
+    local fc_status = (fc_key and fc_key ~= "") and "ĐÃ LƯU" or "CHƯA CÀI"
+    table.insert(items, {
+        text = "Cấu hình Firecrawl API Key: [" .. fc_status .. "]",
+        callback = function()
+            self:showFirecrawlKeyDialog(function()
+                self:showAdvancedSettings(on_return)
+            end)
+        end,
+    })
+
+    local view = ListView:new{
+        title = "Cài đặt Nâng cao & Tải ngầm",
+        item_table = items,
+        on_return_callback = on_return,
+    }
+    UIManager:show(view)
 end
 
 return Browser

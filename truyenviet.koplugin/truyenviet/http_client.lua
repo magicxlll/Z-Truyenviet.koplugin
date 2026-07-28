@@ -387,6 +387,11 @@ function HttpClient:get(url, headers, options)
     return self:request("GET", url, nil, headers, options)
 end
 
+function HttpClient:post(url, body, headers, options)
+    headers = mergeHeaders(headers)
+    return self:request("POST", url, body, headers, options)
+end
+
 function HttpClient:postJson(url, payload, headers)
     local body = ko_util.jsonEncode(payload)
     headers = mergeHeaders(headers)

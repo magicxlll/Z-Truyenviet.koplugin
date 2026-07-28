@@ -98,18 +98,56 @@ function Source:getCompleted(page)
     return result
 end
 
+function Source:getHot(page)
+    page = page or 1
+    local url = self.base_url .. "/danh-sach/truyen-hot/"
+    if page > 1 then
+        url = url .. "trang-" .. page .. "/"
+    end
+    local html, err = Http:get(url)
+    if not html then return nil, err end
+    local result = self:parseListing(html, page)
+    result.title = "Truyện Hot / Đề Cử"
+    return result
+end
+
+function Source:getUpdating(page)
+    page = page or 1
+    local url = self.base_url .. "/danh-sach/truyen-moi/"
+    if page > 1 then
+        url = url .. "trang-" .. page .. "/"
+    end
+    local html, err = Http:get(url)
+    if not html then return nil, err end
+    local result = self:parseListing(html, page)
+    result.title = "Truyện Mới Cập Nhật"
+    return result
+end
+
+function Source:getSections()
+    return {
+        { id = "hot", name = "🔥 Truyện Hot / Đề Cử" },
+        { id = "completed", name = "✅ Truyện Hoàn Thành (Full)" },
+        { id = "updating", name = "🆕 Truyện Mới Cập Nhật" },
+        { id = "genres", name = "📚 Tất Cả Thể Loại" },
+        { id = "search", name = "🔍 Tìm Kiếm Trên TruyenFull" },
+    }
+end
+
 function Source:getGenre(genre, page)
     page = page or 1
-    local url = Util.withTrailingSlash(genre.url)
+    local raw_url = genre and (genre.url or genre.path) or "/danh-sach/truyen-full/"
+    local abs_url = Util.absoluteUrl(self.base_url, raw_url)
+    local url = Util.withTrailingSlash(abs_url)
     if page > 1 then
         url = url .. "trang-" .. page .. "/"
     end
     local html, err = Http:get(url)
     if not html then
-        return nil, err
+        return self:getCompleted(page)
     end
     local result = self:parseListing(html, page)
-    result.title = genre.name
+    result.title = genre and genre.name or "Thể loại"
     result.genre = genre
     return result
 end
