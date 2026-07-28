@@ -54,9 +54,17 @@ local function loadCustomSources()
     local ok_root, root_dir = pcall(function() return Storage:getRootDir() end)
     local data_custom_dir = ok_root and root_dir and (root_dir .. "/custom_sources") or nil
 
-    local dirs_to_check = { custom_dir, data_custom_dir }
+    local dirs_to_check = {
+        -- File JSON đóng gói chỉ bổ sung nguồn mới. Không được âm thầm thay
+        -- module Lua chuyên biệt có cùng id (AkayTruyen từng bị trường hợp này).
+        { path = custom_dir, allow_override = false },
+        -- File do người dùng cài trong thư mục dữ liệu vẫn có thể chủ động
+        -- ghi đè nguồn tích hợp.
+        { path = data_custom_dir, allow_override = true },
+    }
 
-    for _, dir_path in ipairs(dirs_to_check) do
+    for _, dir_config in ipairs(dirs_to_check) do
+        local dir_path = dir_config.path
         if dir_path then
             local ok, lfs_mod = pcall(require, "libs/libkoreader-lfs")
             if not ok then ok, lfs_mod = pcall(require, "lfs") end
@@ -74,7 +82,7 @@ local function loadCustomSources()
                                 local custom_src = GenericSource.create(schema)
                                 if not SOURCES_BY_ID[schema.id] then
                                     registerSource(custom_src)
-                                else
+                                elseif dir_config.allow_override then
                                     SOURCES_BY_ID[schema.id] = custom_src
                                     for idx, s in ipairs(SOURCES) do
                                         if s.id == schema.id then
@@ -299,5 +307,4 @@ function SourceRegistry:getSourceInfo(source_id)
 end
 
 return SourceRegistry
-
 

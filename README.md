@@ -1,6 +1,6 @@
 # Truyện Việt cho KOReader
 
-Plugin KOReader thuần Lua để tìm và đọc (phiên bản 3.0.0):
+Plugin KOReader thuần Lua để tìm và đọc (phiên bản 3.3.5):
 
 - Truyện chữ từ [truyenfull.live](https://truyenfull.live)
 - Truyện tranh từ [truyenqqko.com](https://truyenqqko.com)
@@ -17,6 +17,7 @@ Plugin KOReader thuần Lua để tìm và đọc (phiên bản 3.0.0):
 - Truyện chữ từ [aztruyen.top](https://aztruyen.top)
 - Truyện chữ từ [dualeotruyenfull.net](https://dualeotruyenfull.net)
 - Truyện chữ từ [truyenc.com](https://truyenc.com)
+- Truyện chữ từ [akaytruyen.com](https://akaytruyen.com)
 
 Plugin tải chương về thư mục dữ liệu KOReader rồi mở bằng trình đọc có sẵn:
 
@@ -141,6 +142,7 @@ truyenviet.koplugin/
 Chạy kiểm thử parser độc lập:
 
 ```sh
+luajit spec/akaytruyen_test.lua
 lua spec/parser_test.lua
 lua spec/chapter_downloader_test.lua
 lua spec/storage_test.lua
@@ -206,6 +208,7 @@ Kết quả đúng có dạng:
 
 ```text
 Parser tests passed: 49 assertions
+AkayTruyen tests passed: 10 assertions
 Chapter downloader tests passed: 5 assertions
 Storage tests passed: 19 assertions
 Story results tests passed: 18 assertions

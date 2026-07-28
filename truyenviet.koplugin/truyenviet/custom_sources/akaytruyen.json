@@ -5,7 +5,8 @@
   "base_url": "https://akaytruyen.com",
   "headers": {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    "Referer": "https://akaytruyen.com/"
+    "Referer": "https://akaytruyen.com/",
+    "X-Requested-With": "XMLHttpRequest"
   },
   "completed": {
     "path": "/"
@@ -23,8 +24,8 @@
     "status_pattern": "<span[^>]-class=[\"'][^\"']*text%-success[^\"']*[\"'][^>]*>([%s%S]-)</span>"
   },
   "story_page": {
-    "chapter_item_pattern": "<a[^>]+href=[\"']([^\"']*/chuong[^\"']*)[\"'][^>]*>([%s%S]-)</a>",
-    "total_pages_pattern": "id=[\"']total%-page[\"'][^>]-value=[\"'](%d+)[\"']"
+    "chapter_item_pattern": "<a[^>]+href=[\"']([^\"']+)[\"'][^>]+class=[\"'][^\"']*chapter%-link%-mobile[^\"']*[\"'][^>]*>([%s%S]-)</a>",
+    "total_pages_pattern": "class=[\"']jump%-input[^\"']*[\"'][^>]-max=[\"'](%d+)[\"']"
   },
   "chapter": {
     "title_pattern": "<h[12][^>]*>([%s%S]-)</h[12]>",

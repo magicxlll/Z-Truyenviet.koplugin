@@ -1960,7 +1960,12 @@ function Browser:confirmDownloadChapters(view, page_data, source)
                         local fetch_ok = false
                         local _, err = withLoading("Đang lấy danh sách toàn bộ chương...", function()
                             if type(source.getAllChapters) == "function" then
-                                all_chapters = source:getAllChapters(story)
+                                local fetched_chapters, fetch_err =
+                                    source:getAllChapters(story)
+                                if not fetched_chapters then
+                                    return nil, fetch_err
+                                end
+                                all_chapters = fetched_chapters
                             else
                                 for p = 1, page_data.total_pages do
                                     local p_data = source:getStoryPage(story, p)
@@ -2028,7 +2033,12 @@ function Browser:confirmDownloadBundle(view, page_data, source)
                         local fetch_ok = false
                         local _, err = withLoading("Đang lấy danh sách toàn bộ chương...", function()
                             if type(source.getAllChapters) == "function" then
-                                all_chapters = source:getAllChapters(story)
+                                local fetched_chapters, fetch_err =
+                                    source:getAllChapters(story)
+                                if not fetched_chapters then
+                                    return nil, fetch_err
+                                end
+                                all_chapters = fetched_chapters
                             else
                                 for p = 1, page_data.total_pages do
                                     local p_data = source:getStoryPage(story, p)

@@ -1,5 +1,45 @@
 # Changelog
 
+## 3.3.5 (BUILD-1317) - 2026-07-29
+
+### Codex
+
+- Xác định nguyên nhân runtime chính: `custom_sources/akaytruyen.json` đóng gói
+  trùng ID đã ghi đè module Lua AkayTruyen, khiến bản sửa trong
+  `sources/akaytruyen.lua` không được KOReader sử dụng.
+- Không cho JSON đóng gói ghi đè nguồn Lua tích hợp; vẫn cho phép JSON do người
+  dùng cài trong thư mục dữ liệu chủ động ghi đè.
+- Hỗ trợ đầy đủ cả URL chương mới (`/chuong-N-slug`) và URL legacy
+  (`/N-slug`, `/slug`) bằng class `chapter-link-mobile`, đồng thời loại link
+  hành động/giới thiệu có cùng prefix truyện.
+- Dừng và báo lỗi nếu một trang mục lục tải thất bại, rỗng hoặc lặp dữ liệu;
+  không còn trả về danh sách thiếu như thể đã thành công.
+- Truyền đúng lỗi lấy mục lục từ nguồn lên hai luồng “Tải tất cả các chương” và
+  “Tải thành 1 bộ”.
+- Đồng bộ rule AkayTruyen trong JSON, Source Generator và tài liệu SPEC.
+- Thêm regression test riêng cho AkayTruyen. Kiểm thử live trong môi trường
+  KOReader xác nhận *Chung Cực Truyền Kỳ* có 7 trang và đủ 323 chương duy nhất.
+
+## 3.3.4 (BUILD-1316) - 2026-07-28
+
+### Claude Code
+
+- Cải thiện lấy tiêu đề tìm kiếm khi AkayTruyen tách anchor ảnh và anchor tên.
+- Lọc anchor chương theo cấu trúc class/nội dung và bổ sung điều hướng chương
+  bằng icon chevron.
+- Phiên điều tra tiếp theo trong `session01.md` phát hiện URL chương legacy,
+  nhưng bản sửa nháp còn nhận quá rộng mọi URL con và chưa phát hiện JSON trùng
+  ID ghi đè module Lua.
+
+## 3.3.3 (BUILD-1315) - 2026-07-28
+
+### Claude Code
+
+- Thêm nguồn AkayTruyen, AJAX header `X-Requested-With`, đọc số trang từ
+  `jump-input max`, và luồng lấy toàn bộ trang chương.
+- Sửa crash menu ReaderUI và các thay đổi gộp sách được ghi nhận trong
+  `MEMORY.md`.
+
 ## 3.0.1
 
 - Cập nhật parser cho metruyenvn, aztruyen, truyenc, giatocvuongtai, và dualeotruyenfull.
