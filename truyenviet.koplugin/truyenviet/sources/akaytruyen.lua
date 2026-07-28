@@ -21,15 +21,40 @@ function Source:parseSearch(html)
     local stories = {}
     local seen = {}
 
+    -- Bước 1: Gom map URL truyện -> tiêu đề lấy từ anchor tên truyện
+    -- (akaytruyen tách riêng: anchor ảnh bìa + anchor tiêu đề trong <h3>)
+    local title_by_url = {}
+    for anchor_attrs, anchor_html in html:gmatch("<a([^>]*)>([%s%S]-)</a>") do
+        local href = Util.getAttribute(anchor_attrs, "href")
+        if href and href:find("/truyen/", 1, true) then
+            local full_url = Util.absoluteUrl(self.base_url, href)
+            local class_attr = Util.getAttribute(anchor_attrs, "class") or ""
+            if class_attr:find("story-name", 1, true) or class_attr:find("story-title", 1, true) then
+                local raw_title = Util.stripTags(anchor_html)
+                raw_title = Util.trim(raw_title)
+                if raw_title ~= "" then
+                    title_by_url[full_url] = raw_title
+                end
+            end
+        end
+    end
+
+    -- Bước 2: Thu thập anchor truyện + ảnh bìa
     for anchor_attrs, anchor_html in html:gmatch("<a([^>]*)>([%s%S]-)</a>") do
         local href = Util.getAttribute(anchor_attrs, "href")
         if href and href:find("/truyen/", 1, true) then
             local full_url = Util.absoluteUrl(self.base_url, href)
             if not seen[full_url] then
                 seen[full_url] = true
-                local title = Util.getAttribute(anchor_attrs, "title")
+                local title = title_by_url[full_url]
+                    or Util.getAttribute(anchor_attrs, "title")
                 if not title or title == "" then
-                    title = anchor_html:match('<h%d[^>]*>([%s%S]-)</h%d>') or Util.stripTags(anchor_html)
+                    title = anchor_html:match('<h%d[^>]*>([%s%S]-)</h%d>')
+                    if title then
+                        title = Util.stripTags(title)
+                    else
+                        title = Util.stripTags(anchor_html)
+                    end
                     title = title:gsub("%s+", " ")
                     title = title:gsub("Full.*$", ""):gsub("Hot.*$", ""):gsub("New.*$", ""):gsub("Đang viết.*$", "")
                     title = Util.trim(title)
@@ -158,33 +183,46 @@ function Source:parseStoryPage(html, story, page)
             local abs_href = Util.absoluteUrl(self.base_url, href):gsub("/$", "")
             -- Đường dẫn chương phải có /chuong và khác với URL trang chính truyện
             if abs_href:find("/chuong", 1, true) and abs_href ~= story_url_clean then
-                local num = anchor_html:match('<div[^>]-class="chapter%-number"[^>]*>([%s%S]-)</div>')
-                local title_part = anchor_html:match('<div[^>]-class="chapter%-title"[^>]*>([%s%S]-)</div>')
-                local title
-                if num or title_part then
-                    local clean_num = num and Util.stripTags(num) or ""
-                    local clean_part = title_part and Util.stripTags(title_part) or ""
-                    if clean_num ~= "" and clean_part ~= "" then
-                        title = clean_num .. ": " .. clean_part
+                local class_attr = Util.getAttribute(anchor_attrs, "class") or ""
+                -- Lọc chính xác anchor chương (chapter-link-mobile) và bỏ các
+                -- anchor rác (badge "new-badge", nút phân trang, etc.) dựa
+                -- trên cấu trúc class thay vì nội dung văn bản (dễ vỡ).
+                local is_chapter_anchor = class_attr:find("chapter-link", 1, true)
+                    or anchor_html:find("chapter-number", 1, true)
+                    or anchor_html:find("chapter-title", 1, true)
+
+                if is_chapter_anchor then
+                    local num = anchor_html:match('<div[^>]-class="chapter%-number"[^>]*>([%s%S]-)</div>')
+                    local title_part = anchor_html:match('<div[^>]-class="chapter%-title"[^>]*>([%s%S]-)</div>')
+                    local title
+                    if num or title_part then
+                        local clean_num = num and Util.stripTags(num) or ""
+                        local clean_part = title_part and Util.stripTags(title_part) or ""
+                        if clean_num ~= "" and clean_part ~= "" then
+                            -- Bỏ tiền tố "Chương " nếu cả num và title đều đã chứa
+                            local stripped_num = clean_num:gsub("^%s*[Cc]hương%s*", "")
+                            if stripped_num ~= "" and clean_part:find(stripped_num:gsub("^0+", ""), 1, true) then
+                                title = clean_part
+                            else
+                                title = clean_num .. ": " .. clean_part
+                            end
+                        else
+                            title = clean_num ~= "" and clean_num or clean_part
+                        end
                     else
-                        title = clean_num ~= "" and clean_num or clean_part
+                        title = Util.stripTags(anchor_html)
                     end
-                else
-                    title = Util.stripTags(anchor_html)
-                end
 
-                -- Loại bỏ các ký tự badge ngày tháng rác như 27 T2, 07 T3, 15/02
-                title = title:gsub("^%s*%d+%s*T%d+%s*", "")
-                title = title:gsub("^%s*%d+/%d+%s*", "")
-                title = title:gsub("^%s*%d+%s*[A-Za-z]?%d*%s*", "")
+                    -- Loại bỏ các ký tự badge ngày tháng rác như 27 T2, 07 T3, 15/02
+                    title = title:gsub("^%s*%d+%s*T%d+%s*", "")
+                    title = title:gsub("^%s*%d+/%d+%s*", "")
+                    title = title:gsub("^%s*%d+%s*[A-Za-z]?%d*%s*", "")
 
-                title = Util.decodeHtml(Util.trim(title:gsub("%s+", " ")))
-                if title == "" then
-                    title = Util.getAttribute(anchor_attrs, "title") or "Chương"
-                end
+                    title = Util.decodeHtml(Util.trim(title:gsub("%s+", " ")))
+                    if title == "" then
+                        title = Util.getAttribute(anchor_attrs, "title") or "Chương"
+                    end
 
-                -- Bỏ các thẻ badge rác tiêu đề nếu trùng tên truyện
-                if not title:find("^THI GIẢI SƯ") or title:find("Chương") then
                     table.insert(chapters, {
                         title = title,
                         url = abs_href,
@@ -273,14 +311,41 @@ function Source:parseChapter(html, chapter)
 
     local previous_url
     local next_url
+    -- akaytruyen dùng nút chevron: <a class="... btn-back-next"><i class="fas fa-chevron-left"></i></a>
+    -- và <button disabled ...><i class="fas fa-chevron-right"></i></button> ở chương cuối.
+    -- Vẫn fallback theo id cũ (prev_chap/next_chap) để tương thích nếu markup đổi.
+    -- Hai pass: pass 1 chỉ xét attrs (icon có thể nằm trong body <i>),
+    -- pass 2 xét body để bắt icon class nằm trong thẻ <i> con.
+    -- Tách riêng prev/next: nếu dùng `elseif` thì khi tìm thấy prev sẽ không quét
+    -- tiếp anchor sau đó để tìm next.
     for anchor_attrs in html:gmatch("<a([^>]*)>") do
         local id = Util.getAttribute(anchor_attrs, "id")
         local href = Util.getAttribute(anchor_attrs, "href")
         if href and not href:find("^javascript:") then
-            if id == "prev_chap" or href:find("prev") then
+            if id == "prev_chap" then
                 previous_url = Util.absoluteUrl(self.base_url, href)
-            elseif id == "next_chap" or href:find("next") then
+            end
+            if id == "next_chap" then
                 next_url = Util.absoluteUrl(self.base_url, href)
+            end
+        end
+    end
+    if not previous_url or not next_url then
+        for anchor_attrs, anchor_body in html:gmatch("<a([^>]-)>([%s%S]-)</a>") do
+            local href = Util.getAttribute(anchor_attrs, "href")
+            if href and not href:find("^javascript:") then
+                if not previous_url
+                    and (anchor_body:find("chevron-left", 1, true)
+                        or anchor_body:find("arrow-left", 1, true)
+                        or anchor_body:find("fa-chevron-circle-left", 1, true)) then
+                    previous_url = Util.absoluteUrl(self.base_url, href)
+                end
+                if not next_url
+                    and (anchor_body:find("chevron-right", 1, true)
+                        or anchor_body:find("arrow-right", 1, true)
+                        or anchor_body:find("fa-chevron-circle-right", 1, true)) then
+                    next_url = Util.absoluteUrl(self.base_url, href)
+                end
             end
         end
     end
