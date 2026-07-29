@@ -12,6 +12,9 @@ local TruyenViet = WidgetContainer:extend{
 }
 
 function TruyenViet:init()
+    local FontHelper = require("truyenviet/font_helper")
+    FontHelper:setupComicFont()
+
     if self.ui.name == "ReaderUI" then
         Reader:initializeFromReaderUI(self.ui)
     end
