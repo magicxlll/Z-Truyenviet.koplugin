@@ -4,6 +4,7 @@ local UIManager = require("ui/uimanager")
 local ConfirmBox = require("ui/widget/confirmbox")
 local InfoMessage = require("ui/widget/infomessage")
 local InputDialog = require("ui/widget/inputdialog")
+local Device = require("device")
 local ffiutil = require("ffi/util")
 local util = require("util")
 
@@ -11,7 +12,6 @@ local SendReceiver = {
     base_url = "https://send.nghiendoc.com",
     active_key = nil,
     is_polling = false,
-    active_dialog = nil,
 }
 
 function SendReceiver:generateKey()
@@ -95,7 +95,7 @@ function SendReceiver:fetchAndDownloadByKey(input_key, on_finish)
     if not data or err then
         UIManager:show(InfoMessage:new{
             title = "Send to E-Reader",
-            text = "❌ Không tìm thấy tệp cho mã [" .. clean_key .. "].\n\nNguyên nhân có thể do:\n1. Mã Key chưa chính xác.\n2. Chưa tải tệp lên tại send.nghiendoc.com.\n3. Mã đã quá 30 giây hết hạn."
+            text = "❌ Không tìm thấy tệp cho mã [" .. clean_key .. "].\n\nVui lòng kiểm tra:\n1. Đã bấm 'Tải lên và Gửi' trên send.nghiendoc.com chưa.\n2. Mã key có bị nhập sai không."
         })
         return
     end
@@ -104,7 +104,7 @@ function SendReceiver:fetchAndDownloadByKey(input_key, on_finish)
         local filename = data.file.name
         UIManager:show(ConfirmBox:new{
             title = "Phát Hiện Tệp Mới",
-            text = "🎉 Đã tìm thấy tệp: " .. filename .. "\n\nBạn có muốn tải về máy đọc sách ngay không?",
+            text = "🎉 Đã tìm thấy tệp: " .. filename .. "\n\nBấm Tải Ngay để lưu vào máy đọc sách!",
             ok_text = "📥 Tải Ngay",
             cancel_text = "Hủy",
             ok_callback = function()
@@ -145,7 +145,7 @@ function SendReceiver:fetchAndDownloadByKey(input_key, on_finish)
     else
         UIManager:show(InfoMessage:new{
             title = "Chưa Có Tệp",
-            text = "Mã [" .. clean_key .. "] hợp lệ nhưng chưa có tệp nào được tải lên trên send.nghiendoc.com!"
+            text = "Mã [" .. clean_key .. "] hợp lệ nhưng chưa có tệp nào được gửi trên send.nghiendoc.com!"
         })
     end
 end
@@ -153,142 +153,156 @@ end
 function SendReceiver:showReceiveDialog(on_close)
     local ButtonDialog = require("ui/widget/buttondialog")
 
-    UIManager:show(ButtonDialog:new{
-        title = "📲 Send to E-Reader (send.nghiendoc.com)",
-        text = "Nhận truyện không dây từ Điện thoại / Máy tính vào KOReader",
-        buttons = {
+    local buttons = {
+        {
             {
-                {
-                    text = "📥 Nhập Mã Key 4 Ký Tự (Từ PC/Web)",
-                    callback = function()
-                        UIManager:close(self.active_dialog)
-                        UIManager:show(InputDialog:new{
-                            title = "Nhập Mã Key 4 Ký Tự",
-                            description = "Nhập 4 ký tự hiển thị trên trang send.nghiendoc.com (ví dụ: A7B9):",
-                            text = "",
-                            input_type = "string",
-                            buttons = {
-                                {
-                                    {
-                                        text = "Tải Về Ngay",
-                                        callback = function(input_text)
-                                            self:fetchAndDownloadByKey(input_text, on_close)
-                                        end,
-                                    },
-                                    {
-                                        text = "Hủy",
-                                        callback = function()
-                                            if on_close then on_close() end
-                                        end,
-                                    },
-                                }
-                            }
+                text = "🌐 Mở Trình Duyệt Web Kobo (send.nghiendoc.com)",
+                callback = function()
+                    if Device.openUrl then
+                        Device:openUrl("https://send.nghiendoc.com/")
+                    elseif type(Device.openBrowser) == "function" then
+                        Device:openBrowser("https://send.nghiendoc.com/")
+                    else
+                        UIManager:show(InfoMessage:new{
+                            title = "Mở Trình Duyệt Web",
+                            text = "Vui lòng mở Trình duyệt Web tích hợp của Kobo / Kindle và truy cập địa chỉ:\n\n👉 https://send.nghiendoc.com/\n\nThiết bị sẽ tự động tạo mã Key để nhận sách!"
                         })
-                    end,
-                },
+                    end
+                end,
             },
+        },
+        {
             {
-                {
-                    text = "⚡ Tạo Mã Key Mới & Lắng Nghe Tự Động",
-                    callback = function()
-                        UIManager:close(self.active_dialog)
-                        local key, err = self:generateKey()
-                        if not key then
-                            UIManager:show(InfoMessage:new{
-                                title = "Lỗi tạo mã",
-                                text = "Không thể tạo mã tự động: " .. tostring(err)
-                            })
-                            return
-                        end
+                text = "📥 Tải Sách Theo Mã Key 4 Ký Tự",
+                callback = function()
+                    UIManager:show(InputDialog:new{
+                        title = "Nhập Mã Key 4 Ký Tự",
+                        description = "Nhập mã 4 ký tự hiển thị trên thiết bị hoặc trang send.nghiendoc.com:",
+                        text = "",
+                        input_type = "string",
+                        buttons = {
+                            {
+                                {
+                                    text = "📥 Tải Về Ngay",
+                                    callback = function(input_text)
+                                        self:fetchAndDownloadByKey(input_text, on_close)
+                                    end,
+                                },
+                                {
+                                    text = "Hủy",
+                                    callback = function()
+                                        if on_close then on_close() end
+                                    end,
+                                },
+                            }
+                        }
+                    })
+                end,
+            },
+        },
+        {
+            {
+                text = "⚡ Tự Động Sinh Mã Key Trong Plugin",
+                callback = function()
+                    local key, err = self:generateKey()
+                    if not key then
+                        UIManager:show(InfoMessage:new{
+                            title = "Lỗi tạo mã",
+                            text = "Không thể tạo mã tự động: " .. tostring(err)
+                        })
+                        return
+                    end
 
-                        self.is_polling = true
+                    self.is_polling = true
 
-                        local function startPollingLoop(current_key)
+                    local function pollOnce(current_key)
+                        if not self.is_polling or self.active_key ~= current_key then return end
+
+                        UIManager:scheduleIn(3, function()
                             if not self.is_polling or self.active_key ~= current_key then return end
 
-                            UIManager:scheduleIn(3, function()
-                                if not self.is_polling or self.active_key ~= current_key then return end
-
-                                local data, status_err = self:checkStatus(current_key)
-                                if data and data.file and data.file.name then
-                                    self.is_polling = false
-                                    if self.active_dialog then
-                                        UIManager:close(self.active_dialog)
-                                        self.active_dialog = nil
-                                    end
-
-                                    local filename = data.file.name
-                                    UIManager:show(ConfirmBox:new{
-                                        title = "Phát Hiện Tệp Mới",
-                                        text = "🎉 Đã phát hiện tệp: " .. filename .. "\n\nBấm Tải Ngay để lưu vào máy đọc sách!",
-                                        ok_text = "📥 Tải Ngay",
-                                        cancel_text = "Bỏ qua",
-                                        ok_callback = function()
-                                            self:downloadFile(filename, current_key, function(success, result)
-                                                if success then
-                                                    UIManager:show(ConfirmBox:new{
-                                                        title = "Tải Thành Công",
-                                                        text = "✅ Đã lưu tệp vào máy đọc sách:\n" .. tostring(result) .. "\n\nMở đọc ngay?",
-                                                        ok_text = "📖 Mở Đọc",
-                                                        cancel_text = "Đóng",
-                                                        ok_callback = function()
-                                                            local ReaderUI = require("apps/reader/readerui")
-                                                            if ReaderUI then ReaderUI:showReader(result) end
-                                                        end,
-                                                    })
-                                                else
-                                                    UIManager:show(InfoMessage:new{
-                                                        title = "Lỗi Tải Tệp",
-                                                        text = "Không thể tải tệp: " .. tostring(result)
-                                                    })
-                                                end
-                                            end)
-                                        end,
-                                    })
-                                else
-                                    startPollingLoop(current_key)
-                                end
-                            end)
-                        end
-
-                        local info_text = table.concat({
-                            "🔑 MÃ XÁC NHẬN TỰ ĐỘNG: [  " .. key .. "  ]",
-                            "---------------------------------------",
-                            "1. Mở trang: https://send.nghiendoc.com",
-                            "2. Nhập mã key: " .. key,
-                            "3. Bấm 'Tải lên và Gửi'.",
-                            "",
-                            "🔄 Plugin đang tự động duy trì kết nối mã này...",
-                        }, "\n")
-
-                        self.active_dialog = ConfirmBox:new{
-                            title = "Mã Nhận Tự Động: " .. key,
-                            text = info_text,
-                            ok_text = "📥 Kiểm tra ngay",
-                            cancel_text = "Đóng",
-                            ok_callback = function()
-                                self:fetchAndDownloadByKey(key, on_close)
-                            end,
-                            cancel_callback = function()
+                            local data, status_err = self:checkStatus(current_key)
+                            if data and data.file and data.file.name then
                                 self.is_polling = false
-                                if on_close then on_close() end
-                            end,
-                        }
-                        UIManager:show(self.active_dialog)
-                        startPollingLoop(key)
-                    end,
-                },
+
+                                local filename = data.file.name
+                                UIManager:show(ConfirmBox:new{
+                                    title = "Phát Hiện Tệp Mới",
+                                    text = "🎉 Đã phát hiện tệp: " .. filename .. "\n\nBấm Tải Ngay để lưu vào máy đọc sách!",
+                                    ok_text = "📥 Tải Ngay",
+                                    cancel_text = "Bỏ qua",
+                                    ok_callback = function()
+                                        self:downloadFile(filename, current_key, function(success, result)
+                                            if success then
+                                                UIManager:show(ConfirmBox:new{
+                                                    title = "Tải Thành Công",
+                                                    text = "✅ Đã lưu tệp vào máy đọc sách:\n" .. tostring(result) .. "\n\nMở đọc ngay?",
+                                                    ok_text = "📖 Mở Đọc",
+                                                    cancel_text = "Đóng",
+                                                    ok_callback = function()
+                                                        local ReaderUI = require("apps/reader/readerui")
+                                                        if ReaderUI then ReaderUI:showReader(result) end
+                                                    end,
+                                                })
+                                            else
+                                                UIManager:show(InfoMessage:new{
+                                                    title = "Lỗi Tải Tệp",
+                                                    text = "Không thể tải tệp: " .. tostring(result)
+                                                })
+                                            end
+                                        end)
+                                    end,
+                                })
+                            else
+                                pollOnce(current_key)
+                            end
+                        end)
+                    end
+
+                    local info_text = table.concat({
+                        "🔑 MÃ XÁC NHẬN TỰ ĐỘNG: [  " .. key .. "  ]",
+                        "---------------------------------------",
+                        "1. Mở trang: https://send.nghiendoc.com trên Điện thoại / PC",
+                        "2. Nhập mã key: " .. key,
+                        "3. Bấm 'Tải lên và Gửi'.",
+                        "",
+                        "Bấm 'Kiểm tra tệp' bên dưới để kiểm tra tệp lập tức!",
+                    }, "\n")
+
+                    UIManager:show(ConfirmBox:new{
+                        title = "Mã Nhận Tự Động: " .. key,
+                        text = info_text,
+                        ok_text = "📥 Kiểm Tra Tệp",
+                        cancel_text = "Đóng",
+                        ok_callback = function()
+                            self.is_polling = false
+                            self:fetchAndDownloadByKey(key, on_close)
+                        end,
+                        cancel_callback = function()
+                            self.is_polling = false
+                            if on_close then on_close() end
+                        end,
+                    })
+
+                    pollOnce(key)
+                end,
             },
+        },
+        {
             {
-                {
-                    text = "❌ Đóng",
-                    callback = function()
-                        self.is_polling = false
-                        if on_close then on_close() end
-                    end,
-                },
+                text = "❌ Đóng",
+                callback = function()
+                    self.is_polling = false
+                    if on_close then on_close() end
+                end,
             },
-        }
+        },
+    }
+
+    UIManager:show(ButtonDialog:new{
+        title = "📲 Send to E-Reader (send.nghiendoc.com)",
+        text = "Nhận truyện từ Điện thoại / PC vào Máy Đọc Sách",
+        buttons = buttons,
     })
 end
 
