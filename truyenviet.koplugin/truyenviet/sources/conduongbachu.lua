@@ -36,7 +36,7 @@ local STORIES = {
         title = "Ngoại Truyện: Vạn Đạo Thần Chủ",
         url = "https://conduongbachu.com/ngoai-truyen-van-dao-than-chu/",
         slug = "ngoai-truyen-van-dao-than-chu",
-        cover_url = "https://conduongbachu.com/wp-content/uploads/2024/12/20355-con-duong-ba-chu_cover_large.webp",
+        cover_url = "https://conduongbachu.com/wp-content/uploads/2025/04/conduongbachu-ngoai-truyen-268x400.jpg",
     },
     {
         id = "chua-te-chi-lo",
@@ -44,7 +44,7 @@ local STORIES = {
         title = "Ngoại Truyện: Chúa Tể Chi Lộ",
         url = "https://conduongbachu.com/ngoai-truyen-chua-te-chi-lo/",
         slug = "ngoai-truyen-chua-te-chi-lo",
-        cover_url = "https://conduongbachu.com/wp-content/uploads/2024/12/20355-con-duong-ba-chu_cover_large.webp",
+        cover_url = "https://conduongbachu.com/wp-content/uploads/2025/04/conduongbachu-ngoai-truyen-268x400.jpg",
     },
 }
 
@@ -61,20 +61,36 @@ local function absolute(base_url, href)
 end
 
 local function detectStoryConfig(story_or_url)
-    local target_url = type(story_or_url) == "table" and story_or_url.url or tostring(story_or_url or "")
+    local target_url = type(story_or_url) == "table" and (story_or_url.url or story_or_url.story_url) or tostring(story_or_url or "")
     target_url = target_url:gsub("%?.*$", ""):gsub("/$", "") .. "/"
 
+    -- 1. Ưu tiên khớp chính xác theo URL trước
     for _, config in ipairs(STORIES) do
         local config_url = config.url:gsub("/$", "") .. "/"
-        if target_url == config_url or target_url:find(config.slug, 1, true) then
+        if target_url == config_url then
             return config
         end
     end
+
+    -- 2. Khớp slug từ chuỗi dài nhất tới ngắn nhất (tránh ngoai-truyen ăn nhầm ngoai-truyen-chua-te-chi-lo)
+    local sorted = {}
+    for _, config in ipairs(STORIES) do
+        table.insert(sorted, config)
+    end
+    table.sort(sorted, function(a, b) return #a.slug > #b.slug end)
+
+    for _, config in ipairs(sorted) do
+        if target_url:find(config.slug, 1, true) then
+            return config
+        end
+    end
+
     return STORIES[1]
 end
 
 local function parseChapterNumber(title, url)
-    return tonumber((title or ""):match("[Cc]hương%s*(%d+)"))
+    return tonumber((title or ""):match("[Cc][Hh]ƯƠ[Nn][Gg]%s*(%d+)"))
+        or tonumber((title or ""):match("[Cc]hương%s*(%d+)"))
         or tonumber((title or ""):match("(%d+)"))
         or tonumber((url or ""):match("/chuong%-(%d+)"))
         or 0
@@ -112,7 +128,8 @@ local function parseWpPosts(raw, base_url, source_id, story_url)
         title = Util.decodeHtml(title)
         local link = post.link and absolute(base_url, post.link) or nil
 
-        if link and title ~= "" then
+        -- Bỏ các bài viết không phải chương (ví dụ bài "Bầu chọn ngoại truyện")
+        if link and title ~= "" and (title:find("Chương") or title:find("CHƯƠNG") or link:find("/chuong-", 1, true)) then
             local number = parseChapterNumber(title, link)
             table.insert(chapters, {
                 title = title,
