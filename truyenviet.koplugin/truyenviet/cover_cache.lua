@@ -100,6 +100,16 @@ function CoverCache:prefetch(stories, registry)
     if fast_mode then return stories end
     
     local limit = #stories
+    local function safePrefetch(story)
+        local source = registry:get(story.source_id)
+        if not source then
+            return
+        end
+        local ok, cover_path = pcall(self.download, self, story, source)
+        if ok then
+            story.cover_path = cover_path
+        end
+    end
     
     local ok, copas = pcall(require, "copas")
     if ok and copas and copas.addthread then
@@ -114,10 +124,7 @@ function CoverCache:prefetch(stories, registry)
             active_downloads = active_downloads + 1
             copas.addthread(function()
                 local story = stories[index]
-                local source = registry:get(story.source_id)
-                if source then
-                    story.cover_path = self:download(story, source)
-                end
+                safePrefetch(story)
                 active_downloads = active_downloads - 1
             end)
         end
@@ -128,10 +135,7 @@ function CoverCache:prefetch(stories, registry)
     else
         for index = 1, #stories do
             local story = stories[index]
-            local source = registry:get(story.source_id)
-            if source then
-                story.cover_path = self:download(story, source)
-            end
+            safePrefetch(story)
             if index % 5 == 0 then
                 collectgarbage("collect")
             end

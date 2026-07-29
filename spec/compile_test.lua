@@ -28,6 +28,7 @@ local files = {
     "truyenviet.koplugin/truyenviet/storage.lua",
     "truyenviet.koplugin/truyenviet/version.lua",
     "truyenviet.koplugin/truyenviet/sources/cbunu.lua",
+    "truyenviet.koplugin/truyenviet/sources/conduongbachu.lua",
     "truyenviet.koplugin/truyenviet/sources/dualeo.lua",
     "truyenviet.koplugin/truyenviet/sources/haccbl.lua",
     "truyenviet.koplugin/truyenviet/sources/truyendich.lua",

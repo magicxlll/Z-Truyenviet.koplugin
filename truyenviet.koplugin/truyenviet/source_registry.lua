@@ -23,6 +23,7 @@ local BUILTIN_SOURCES = {
     require("truyenviet/sources/storyaclick"),
     require("truyenviet/sources/vireal"),
     require("truyenviet/sources/metruyenchuvn"),
+    require("truyenviet/sources/conduongbachu"),
 }
 
 local SOURCES = {}
@@ -307,4 +308,3 @@ function SourceRegistry:getSourceInfo(source_id)
 end
 
 return SourceRegistry
-

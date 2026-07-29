@@ -1,6 +1,6 @@
 # Truyện Việt cho KOReader
 
-Plugin KOReader thuần Lua để tìm và đọc (phiên bản 3.3.7 BUILD-1319):
+Plugin KOReader thuần Lua để tìm và đọc (phiên bản 3.3.8 BUILD-1320):
 
 - Truyện chữ từ [truyenfull.live](https://truyenfull.live)
 - Truyện tranh từ [truyenqqko.com](https://truyenqqko.com)
@@ -18,6 +18,7 @@ Plugin KOReader thuần Lua để tìm và đọc (phiên bản 3.3.7 BUILD-1319
 - Truyện chữ từ [dualeotruyenfull.net](https://dualeotruyenfull.net)
 - Truyện chữ từ [truyenc.com](https://truyenc.com)
 - Truyện chữ từ [akaytruyen.com](https://akaytruyen.com)
+- Truyện chữ từ [conduongbachu.com](https://conduongbachu.com)
 
 Plugin tải chương về thư mục dữ liệu KOReader rồi mở bằng trình đọc có sẵn:
 

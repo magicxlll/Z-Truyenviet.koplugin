@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.3.8 (BUILD-1320) - 2026-07-29
+
+### Codex
+
+- Thêm source **Con Đường Bá Chủ** (`conduongbachu.com`) cho danh mục,
+  tìm kiếm, mục lục và đọc chương.
+- Dùng WordPress REST index (`categories=3`, 100 bài/trang) để lấy toàn bộ
+  bài chương; fallback sang `<select class="chapter-selector">` nếu REST API
+  bị tắt. Dedupe theo số chương để xử lý dữ liệu website có bài 3059 trùng.
+- Hỗ trợ URL slug bất thường như `/3399-vo-de/`, lấy số chương từ tiêu đề
+  hiển thị thay vì đoán từ slug. Không tự tạo chương 3509 vì website hiện
+  không có bài tương ứng.
+- Parser nội dung chỉ giữ các đoạn văn trong `entry-content`, loại phần
+  giới thiệu tìm kiếm và metadata trình đọc audio; giữ liên kết chương trước/sau.
+- Cứng hóa SearchService: không để source trả dữ liệu sai định dạng làm crash
+  vòng lặp tìm kiếm; bỏ qua kết quả thiếu `source_id`/URL/tiêu đề, chặn query
+  rỗng và cô lập lỗi từng nguồn.
+- Kiểm thử: 17 assertion source, 17 assertion chapter order, search regression,
+  35 file Lua compile; live KOReader đạt 76 trang và 3.751 chương duy nhất.
+
 ## 3.3.7 (BUILD-1319) - 2026-07-29
 
 ### Codex
