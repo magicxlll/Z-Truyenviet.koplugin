@@ -43,17 +43,22 @@ function FontHelper:setupComicFont()
             end)
         end
 
-        -- 2. Đăng ký ComicHelvetic-Light vào FontList và Font.fontmap của KOReader
         if FontList then
-            FontList.fontinfo["ComicHelvetic-Light.ttf"] = {
+            local entry = {
                 {
-                    family = "ComicHelvetic-Light",
+                    family = "Comic Helvetic",
                     name = "ComicHelvetic-Light",
                     path = primary_target,
                 }
             }
-            FontList.fontnames["ComicHelvetic-Light"] = FontList.fontinfo["ComicHelvetic-Light.ttf"]
-            FontList.fontnames["ComicHelvetic-Light.ttf"] = FontList.fontinfo["ComicHelvetic-Light.ttf"]
+            FontList.fontinfo["ComicHelvetic-Light.ttf"] = entry
+            FontList.fontinfo["ComicHelvetic-Light"] = entry
+            FontList.fontinfo["Comic Helvetic"] = entry
+
+            FontList.fontnames["Comic Helvetic"] = entry
+            FontList.fontnames["ComicHelvetic-Light"] = entry
+            FontList.fontnames["ComicHelvetic-Light.ttf"] = entry
+
             if not util.tableContains(FontList.fontlist, "ComicHelvetic-Light.ttf") then
                 table.insert(FontList.fontlist, "ComicHelvetic-Light.ttf")
             end
@@ -83,11 +88,14 @@ function FontHelper:setupComicFont()
                 Font.fontmap.pgfont = "ComicHelvetic-Light.ttf"
             end
 
-            -- Intercept Font:getFace so all UI widgets get Comic font
             if not Font._truyenviet_original_getFace then
                 Font._truyenviet_original_getFace = Font.getFace
                 Font.getFace = function(font_self, font_name, size, ...)
-                    local ok, face = pcall(Font._truyenviet_original_getFace, font_self, "ComicHelvetic-Light.ttf", size, ...)
+                    local ok, face = pcall(Font._truyenviet_original_getFace, font_self, primary_target, size, ...)
+                    if ok and face then
+                        return face
+                    end
+                    ok, face = pcall(Font._truyenviet_original_getFace, font_self, "ComicHelvetic-Light.ttf", size, ...)
                     if ok and face then
                         return face
                     end
@@ -103,7 +111,13 @@ function FontHelper:getFace(alias, size)
     if not self._initialized then
         self:setupComicFont()
     end
-    local ok, face = pcall(Font.getFace, Font, "ComicHelvetic-Light.ttf", size)
+    local data_dir = DataStorage:getDataDir()
+    local primary_target = ffiutil.joinPath(data_dir, "fonts/ComicHelvetic-Light.ttf")
+    local ok, face = pcall(Font.getFace, Font, primary_target, size)
+    if ok and face then
+        return face
+    end
+    ok, face = pcall(Font.getFace, Font, "ComicHelvetic-Light.ttf", size)
     if ok and face then
         return face
     end

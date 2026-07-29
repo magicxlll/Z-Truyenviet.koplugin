@@ -139,19 +139,11 @@ function Source:getUpdating(page)
     local res = self:search("")
     return {
         stories = res or {},
-        genres = {},
-        page = page or 1,
-        total_pages = 1,
-        title = "Truyện Mới Cập Nhật",
-    }
-end
-
-function Source:getSections()
+function Source:getGenresList()
     return {
-        { id = "hot", name = "🔥 Truyện Hot / Đề Cử" },
-        { id = "completed", name = "✅ Truyện Hoàn Thành (Full)" },
-        { id = "updating", name = "🆕 Truyện Đang Ra / Cập Nhật Mới" },
-        { id = "search", name = "🔍 Tìm Kiếm Trên Vireal" },
+        { name = "🔥 Truyện Hot / Đề Cử", section = "hot", url = self.base_url },
+        { name = "✅ Truyện Hoàn Thành (Full)", section = "completed", url = self.base_url },
+        { name = "🆕 Truyện Đang Ra / Cập Nhật Mới", section = "updating", url = self.base_url },
     }
 end
 

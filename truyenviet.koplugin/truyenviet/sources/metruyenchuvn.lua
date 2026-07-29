@@ -179,11 +179,48 @@ function Source:getUpdating(page)
 
     return {
         stories = stories,
-        genres = {},
+        genres = self:getGenresList() or {},
         page = page,
         total_pages = Util.maxPage(html, page),
         title = "Truyện Mới Cập Nhật",
     }
+end
+
+function Source:getGenresList()
+    local html = Http:get(self.base_url .. "/", {
+        ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    })
+    local genres = {}
+    local seen = {}
+    if html then
+        html = normalizeHtml(html)
+        for href, title in html:gmatch('<a[^>]+href="([^"]*the%-loai[^"]*)"[^>]*>([^<]+)</a>') do
+            local clean_title = Util.trim(Util.decodeHtml(title))
+            if clean_title ~= "" and not seen[href] then
+                seen[href] = true
+                table.insert(genres, {
+                    name = clean_title,
+                    url = Util.absoluteUrl(self.base_url, href),
+                })
+            end
+        end
+    end
+
+    if #genres == 0 then
+        return {
+            { name = "Tiên Hiệp", url = self.base_url .. "/the-loai/tien-hiep" },
+            { name = "Kiếm Hiệp", url = self.base_url .. "/the-loai/kiem-hiep" },
+            { name = "Ngôn Tình", url = self.base_url .. "/the-loai/ngon-tinh" },
+            { name = "Huyền Huyễn", url = self.base_url .. "/the-loai/huyen-huyen" },
+            { name = "Đô Thị", url = self.base_url .. "/the-loai/do-thi" },
+            { name = "Khoa Huyễn", url = self.base_url .. "/the-loai/khoa-huyen" },
+            { name = "Hệ Thống", url = self.base_url .. "/the-loai/he-thong" },
+            { name = "Xuyên Không", url = self.base_url .. "/the-loai/xuyen-khong" },
+            { name = "Võng Du", url = self.base_url .. "/the-loai/vong-du" },
+            { name = "Linh Dị", url = self.base_url .. "/the-loai/linh-di" },
+        }
+    end
+    return genres
 end
 
 function Source:getSections()

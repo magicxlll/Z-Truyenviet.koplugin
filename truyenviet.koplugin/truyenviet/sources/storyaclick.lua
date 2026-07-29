@@ -70,15 +70,62 @@ function Source:getCompleted(page)
     local meta = parsed.meta or {}
     return {
         stories = stories,
-        genres = {},
+        genres = self:getGenresList() or {},
         page = page,
         total_pages = meta.totalPages or 1,
         title = "Truyện mới nhất",
     }
 end
 
+function Source:getGenresList()
+    local parsed, err = apiGet("/genres")
+    if not parsed or not parsed.data then return nil, err end
+
+    local genres = {}
+    for _, item in ipairs(parsed.data) do
+        if item.name and item.slug then
+            table.insert(genres, {
+                name = item.name,
+                url = self.base_url .. "/the-loai/" .. item.slug,
+                slug = item.slug,
+                id = item.id,
+            })
+        end
+    end
+    return genres
+end
+
 function Source:getGenre(genre, page)
-    return self:getCompleted(page)
+    page = page or 1
+    local slug = type(genre) == "table" and (genre.slug or (genre.url and genre.url:match("/the%-loai/([^/?]+)"))) or "linh-di"
+    local parsed, err = apiGet("/genres/slug/" .. slug)
+    if not parsed or not parsed.data then
+        return self:getCompleted(page)
+    end
+
+    local raw_stories = parsed.data.stories or {}
+    local stories = {}
+    for _, item in ipairs(raw_stories) do
+        local cover = item.coverUrl
+        if cover and cover:sub(1, 1) == "/" then
+            cover = self.base_url .. cover
+        end
+        table.insert(stories, {
+            source_id = self.id,
+            title = item.title or "Chưa có tiêu đề",
+            url = self.base_url .. "/truyen/" .. item.slug,
+            cover_url = cover,
+            kind = "text",
+        })
+    end
+
+    return {
+        stories = stories,
+        genres = self:getGenresList() or {},
+        page = page,
+        total_pages = 1,
+        title = type(genre) == "table" and genre.name or ("Thể loại " .. slug),
+    }
 end
 
 function Source:getStoryDetails(story)
