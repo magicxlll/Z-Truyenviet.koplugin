@@ -16,7 +16,7 @@ function SearchService:search(query, sources)
         local ok, stories, err = pcall(source.search, source, query)
         
         -- Nếu tìm theo từ có dấu không ra kết quả, thử lại với từ không dấu
-        if (not ok or type(stories) ~= "table" or #stories == 0)
+        if ok and type(stories) == "table" and #stories == 0
                 and unaccented_query ~= query then
             local ok2, stories2, err2 = pcall(source.search, source, unaccented_query)
             if ok2 and type(stories2) == "table" and #stories2 > 0 then
@@ -51,14 +51,14 @@ function SearchService:search(query, sources)
                         and story.title ~= "" then
                     local key = story.source_id .. "|" .. story.url
                     if not seen[key] then
-                    seen[key] = true
-                    story.source_name = source.name
-                    story.search_score = Util.searchScore(
-                        query,
-                        story.title,
-                        result_index + (source_index - 1) * 100
-                    )
-                    table.insert(results, story)
+                        seen[key] = true
+                        story.source_name = source.name
+                        story.search_score = Util.searchScore(
+                            query,
+                            story.title,
+                            result_index + (source_index - 1) * 100
+                        )
+                        table.insert(results, story)
                     end
                 end
             end

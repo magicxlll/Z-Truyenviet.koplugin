@@ -86,4 +86,20 @@ assert(
     "source exception was not surfaced as an error"
 )
 
+local failed_calls = 0
+SearchService:search("đường", {
+    {
+        id = "slow-failure",
+        name = "Slow Failure",
+        search = function()
+            failed_calls = failed_calls + 1
+            error("simulated timeout")
+        end,
+    },
+})
+assert(
+    failed_calls == 1,
+    "failed accented search was retried and doubled the wait time"
+)
+
 print("Search service tests passed")

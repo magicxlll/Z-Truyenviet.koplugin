@@ -99,7 +99,7 @@ function CoverCache:prefetch(stories, registry)
     local fast_mode = Storage.settings and Storage.settings:readSetting("fast_mode", false)
     if fast_mode then return stories end
     
-    local limit = #stories
+    local limit = math.min(#stories, self.max_prefetch)
     local function safePrefetch(story)
         local source = registry:get(story.source_id)
         if not source then
@@ -133,7 +133,7 @@ function CoverCache:prefetch(stories, registry)
             copas.step()
         end
     else
-        for index = 1, #stories do
+        for index = 1, limit do
             local story = stories[index]
             safePrefetch(story)
             if index % 5 == 0 then

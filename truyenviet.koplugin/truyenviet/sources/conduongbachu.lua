@@ -9,9 +9,12 @@ local Source = {
     base_url = "https://conduongbachu.com",
     reversed_chapters = false,
     _chapter_index = {},
+    _chapter_pages = {},
 }
 
 local PAGE_SIZE = 50
+local REST_PAGE_SIZE = 100
+local MAX_REST_PAGES = 100
 
 local STORIES = {
     {
@@ -20,6 +23,7 @@ local STORIES = {
         title = "Con Đường Bá Chủ (Chính Truyện)",
         url = "https://conduongbachu.com/",
         slug = "chapter-truyen",
+        all_posts_are_chapters = true,
         cover_url = "https://conduongbachu.com/wp-content/uploads/2024/12/20355-con-duong-ba-chu_cover_large.webp",
     },
     {
@@ -128,8 +132,16 @@ local function parseWpPosts(raw, base_url, source_id, story_url)
         title = Util.decodeHtml(title)
         local link = post.link and absolute(base_url, post.link) or nil
 
-        -- Bỏ các bài viết không phải chương (ví dụ bài "Bầu chọn ngoại truyện")
-        if link and title ~= "" and (title:find("Chương") or title:find("CHƯƠNG") or link:find("/chuong-", 1, true)) then
+        -- Bỏ bài không phải chương (ví dụ "Bầu chọn ngoại truyện"), nhưng
+        -- vẫn giữ slug legacy như /3399-vo-de/ với tiêu đề "3399: VÔ ĐỀ.".
+        local starts_with_number =
+            title:match("^%s*%d+%s*[:%-%.]") ~= nil
+        if link and title ~= "" and (
+                title:find("Chương")
+                or title:find("CHƯƠNG")
+                or link:find("/chuong-", 1, true)
+                or starts_with_number
+            ) then
             local number = parseChapterNumber(title, link)
             table.insert(chapters, {
                 title = title,
@@ -142,46 +154,155 @@ local function parseWpPosts(raw, base_url, source_id, story_url)
             })
         end
     end
-    return chapters
+    return chapters, #posts
 end
 
-local function chapterIndex(self, story)
-    local config = detectStoryConfig(story)
-    local cache_key = config.id
-    if self._chapter_index[cache_key] then
-        return self._chapter_index[cache_key]
+local function responseHeader(headers, wanted)
+    wanted = wanted:lower()
+    for name, value in pairs(headers or {}) do
+        if tostring(name):lower() == wanted then
+            return value
+        end
+    end
+    return nil
+end
+
+local function wpApiUrl(self, config, api_page)
+    return self.base_url
+        .. "/wp-json/wp/v2/posts?categories=" .. config.cat_id
+        .. "&per_page=" .. REST_PAGE_SIZE
+        .. "&_fields=link,title&page=" .. api_page
+        .. "&order=asc&orderby=date"
+end
+
+local function requestWpPage(self, config, api_page)
+    local api_url = wpApiUrl(self, config, api_page)
+    local raw_json, request_err, response_headers, status =
+        Http:get(api_url, stdHeaders(self.base_url))
+
+    if not raw_json or raw_json == "" then
+        return nil, string.format(
+            "Không thể tải mục lục WordPress trang %d: %s",
+            api_page,
+            tostring(request_err or "phản hồi rỗng")
+        )
+    end
+    if tonumber(status) and tonumber(status) >= 400 then
+        return nil, string.format(
+            "Không thể tải mục lục WordPress trang %d: HTTP %s",
+            api_page,
+            tostring(status)
+        )
+    end
+    if raw_json:find('"code":', 1, true) then
+        return nil, string.format(
+            "WordPress trả lỗi ở trang mục lục %d",
+            api_page
+        )
     end
 
-    local story_url = config.url
+    local chapters, raw_post_count = parseWpPosts(
+        raw_json,
+        self.base_url,
+        self.id,
+        config.url
+    )
+    if not chapters then
+        return nil, string.format(
+            "Dữ liệu mục lục WordPress trang %d không hợp lệ",
+            api_page
+        )
+    end
+
+    local total_posts = tonumber(responseHeader(response_headers, "x-wp-total"))
+    local total_api_pages =
+        tonumber(responseHeader(response_headers, "x-wp-totalpages"))
+
+    if not total_api_pages and raw_post_count < REST_PAGE_SIZE then
+        total_api_pages = api_page
+    end
+    if not total_posts and total_api_pages == api_page then
+        total_posts = (api_page - 1) * REST_PAGE_SIZE + raw_post_count
+    end
+
+    return {
+        chapters = chapters,
+        raw_post_count = raw_post_count,
+        total_posts = total_posts,
+        total_api_pages = total_api_pages,
+        api_page = api_page,
+    }
+end
+
+local function cachedWpPage(self, config, api_page)
+    self._chapter_pages[config.id] = self._chapter_pages[config.id] or {}
+    local cached = self._chapter_pages[config.id][api_page]
+    if cached then
+        return cached
+    end
+
+    local result, err = requestWpPage(self, config, api_page)
+    if not result then
+        return nil, err
+    end
+    self._chapter_pages[config.id][api_page] = result
+    return result
+end
+
+local function completeChapterIndex(self, story)
+    local config = detectStoryConfig(story)
+    if self._chapter_index[config.id] then
+        return self._chapter_index[config.id]
+    end
+
+    local first, first_err = cachedWpPage(self, config, 1)
+    if not first then
+        return nil, first_err
+    end
+
+    local total_api_pages = first.total_api_pages
+    if not total_api_pages then
+        return nil, "WordPress không trả tổng số trang mục lục"
+    end
+    if total_api_pages < 1 or total_api_pages > MAX_REST_PAGES then
+        return nil, string.format(
+            "Tổng số trang mục lục WordPress không hợp lệ: %s",
+            tostring(total_api_pages)
+        )
+    end
+
     local chapters = {}
-    local p = 1
-
-    while p <= 50 do
-        local api_url = self.base_url .. "/wp-json/wp/v2/posts?categories=" .. config.cat_id .. "&per_page=100&_fields=link,title&page=" .. p
-        local raw_json = Http:get(api_url, stdHeaders(self.base_url))
-
-        if not raw_json or raw_json == "" or raw_json:find('"code":', 1, true) then
-            break
+    local raw_post_count = 0
+    for api_page = 1, total_api_pages do
+        local page_data, page_err = cachedWpPage(self, config, api_page)
+        if not page_data then
+            return nil, page_err
         end
-
-        local p_chaps = parseWpPosts(raw_json, self.base_url, self.id, story_url)
-        if not p_chaps or #p_chaps == 0 then
-            break
+        raw_post_count = raw_post_count + page_data.raw_post_count
+        for _, chapter in ipairs(page_data.chapters) do
+            chapters[#chapters + 1] = chapter
         end
+    end
 
-        for _, ch in ipairs(p_chaps) do
-            table.insert(chapters, ch)
-        end
-
-        if #p_chaps < 100 then
-            break
-        end
-
-        p = p + 1
+    if first.total_posts and raw_post_count ~= first.total_posts then
+        return nil, string.format(
+            "Mục lục chưa đủ: nhận %d/%d bài WordPress",
+            raw_post_count,
+            first.total_posts
+        )
     end
 
     chapters = uniqueChapters(chapters)
-    self._chapter_index[cache_key] = chapters
+    if config.all_posts_are_chapters
+            and first.total_posts
+            and #chapters ~= first.total_posts then
+        return nil, string.format(
+            "Mục lục chính truyện thiếu: nhận %d/%d chương",
+            #chapters,
+            first.total_posts
+        )
+    end
+    self._chapter_index[config.id] = chapters
     return chapters
 end
 
@@ -271,39 +392,61 @@ end
 
 function Source:getStoryPage(story, page)
     page = math.max(1, tonumber(page) or 1)
-    local chapters, err = chapterIndex(self, story)
-    if not chapters then
-        return nil, err
-    end
-
-    local total_pages = math.max(1, math.ceil(#chapters / PAGE_SIZE))
-    if page > total_pages then
-        page = total_pages
-    end
-
-    local first = (page - 1) * PAGE_SIZE + 1
+    local config = detectStoryConfig(story)
     local page_chapters = {}
-    for index = first, math.min(#chapters, first + PAGE_SIZE - 1) do
-        local chapter = chapters[index]
+
+    local complete = self._chapter_index[config.id]
+    local total_pages
+    if complete then
+        total_pages = math.max(1, math.ceil(#complete / PAGE_SIZE))
+        page = math.min(page, total_pages)
+        local first = (page - 1) * PAGE_SIZE + 1
+        for index = first, math.min(#complete, first + PAGE_SIZE - 1) do
+            page_chapters[#page_chapters + 1] = complete[index]
+        end
+    else
+        local api_page = math.floor((page - 1) / 2) + 1
+        local page_data, page_err = cachedWpPage(self, config, api_page)
+        if not page_data then
+            return nil, page_err
+        end
+        if not page_data.total_posts then
+            return nil, "WordPress không trả tổng số bài chương"
+        end
+
+        total_pages = math.max(
+            1,
+            math.ceil(page_data.total_posts / PAGE_SIZE)
+        )
+        page = math.min(page, total_pages)
+        local offset = ((page - 1) % 2) * PAGE_SIZE
+        local normalized = uniqueChapters(page_data.chapters)
+        for index = offset + 1, math.min(#normalized, offset + PAGE_SIZE) do
+            page_chapters[#page_chapters + 1] = normalized[index]
+        end
+    end
+
+    local copied_chapters = {}
+    for _, chapter in ipairs(page_chapters) do
         local copy = {}
         for key, value in pairs(chapter) do
             copy[key] = value
         end
         copy.story_url = story.url
-        table.insert(page_chapters, copy)
+        copied_chapters[#copied_chapters + 1] = copy
     end
 
     story.details = story.details or self:getStoryDetails(story)
     return {
         story = story,
-        chapters = page_chapters,
+        chapters = copied_chapters,
         page = page,
         total_pages = total_pages,
     }
 end
 
 function Source:getAllChapters(story)
-    local chapters, err = chapterIndex(self, story)
+    local chapters, err = completeChapterIndex(self, story)
     if not chapters then
         return nil, err
     end

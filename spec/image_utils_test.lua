@@ -29,9 +29,9 @@ assertEqual(
     true,
     ImageUtils:isSupported(
         { ["content-type"] = "image/jpeg; charset=binary" },
-        "payload"
+        "\255\216\255payload"
     ),
-    "Recognizes image content type"
+    "Recognizes JPEG signature with image content type"
 )
 assertEqual(
     false,

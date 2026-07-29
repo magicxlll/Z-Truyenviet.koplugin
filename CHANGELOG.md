@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.4.3 (BUILD-1325) - 2026-07-29
+
+### Codex
+
+- Làm lại phân trang nguồn **Con Đường Bá Chủ** theo REST API WordPress tăng
+  dần: mở một trang chỉ tải đúng một trang API, còn `Tải tất cả` chỉ lưu chỉ
+  mục khi đã nhận đủ toàn bộ số bài mà `X-WP-Total` công bố. Request lỗi giữa
+  chừng không còn bị cache thành danh sách chương cụt.
+- Giữ từng bài WordPress theo URL, bao gồm hai bài cùng số **3059** và slug
+  legacy `/3399-vo-de/`; kiểm tra không bỏ sót bài chính truyện và không tự
+  sinh chương không tồn tại **3509**.
+- Cô lập lỗi tải ảnh bìa khi tìm kiếm và giới hạn prefetch tối đa 10 ảnh để
+  tránh treo hoặc thiếu bộ nhớ KOReader.
+- Không thử lại lần hai một nguồn tìm kiếm đã ném exception; chỉ fallback bỏ
+  dấu khi lần đầu trả về danh sách hợp lệ nhưng rỗng.
+- Thêm regression/live test: 18 assertion parser, kiểm tra lỗi REST giữa trang,
+  live 3.752 bài chính truyện/76 trang, 15/16/6 chương ngoại truyện, tìm kiếm
+  4 kết quả không lỗi và tải chương đầu/cuối.
+
 ## 3.3.8 (BUILD-1320) - 2026-07-29
 
 ### Codex

@@ -1,6 +1,6 @@
 # Truyện Việt cho KOReader
 
-Plugin KOReader thuần Lua để tìm và đọc (phiên bản 3.4.0 BUILD-1322):
+Plugin KOReader thuần Lua để tìm và đọc (phiên bản 3.4.3 BUILD-1325):
 
 - Truyện chữ từ [truyenfull.live](https://truyenfull.live)
 - Truyện tranh từ [truyenqqko.com](https://truyenqqko.com)
@@ -127,6 +127,7 @@ truyenviet.koplugin/
       truyenc.lua
       teenfic.lua
       mizzya.lua
+      conduongbachu.lua
 ```
 
 Đóng gói trên Windows:
@@ -145,6 +146,9 @@ Chạy kiểm thử parser độc lập:
 
 ```sh
 luajit spec/akaytruyen_test.lua
+luajit spec/conduongbachu_test.lua
+luajit spec/cover_cache_test.lua
+luajit spec/search_service_test.lua
 lua spec/parser_test.lua
 lua spec/chapter_downloader_test.lua
 lua spec/storage_test.lua
