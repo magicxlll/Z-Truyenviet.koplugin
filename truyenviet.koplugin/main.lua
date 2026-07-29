@@ -12,9 +12,6 @@ local TruyenViet = WidgetContainer:extend{
 }
 
 function TruyenViet:init()
-    local FontHelper = require("truyenviet/font_helper")
-    FontHelper:setupComicFont()
-
     if self.ui.name == "ReaderUI" then
         Reader:initializeFromReaderUI(self.ui)
     end
@@ -72,43 +69,39 @@ function TruyenViet:addToMainMenu(menu_items)
 
     local title_text = "🔥 Truyện Việt v" .. Version
 
-    -- Đăng ký vào tất cả các tab Menu (Main, Tools, Search, File, Document)
-    menu_items.truyenviet_main = {
-        text = title_text,
-        sorting_hint = "main",
-        callback = openTruyenViet,
-    }
-    menu_items.truyenviet_tools = {
-        text = title_text,
-        sorting_hint = "tools",
-        callback = openTruyenViet,
-    }
-    menu_items.truyenviet_search = {
-        text = title_text,
-        sorting_hint = "search",
-        callback = openTruyenViet,
-    }
-    menu_items.truyenviet_file = {
-        text = title_text,
-        sorting_hint = "file",
-        callback = openTruyenViet,
-    }
-    menu_items.truyenviet_document = {
-        text = title_text,
-        sorting_hint = "document",
-        callback = openTruyenViet,
-    }
-
-    menu_items.truyenviet_continue_main = {
-        text = "📖 Truyện Việt: Tiếp tục đọc",
-        sorting_hint = "main",
-        callback = openContinue,
-    }
-    menu_items.truyenviet_continue_tools = {
-        text = "📖 Truyện Việt: Tiếp tục đọc",
-        sorting_hint = "tools",
-        callback = openContinue,
-    }
+    if self.ui and self.ui.name == "ReaderUI" then
+        menu_items.truyenviet_reader_tools = {
+            text = title_text,
+            sorting_hint = "tools",
+            callback = openTruyenViet,
+        }
+    else
+        menu_items.truyenviet_search = {
+            text = title_text,
+            sorting_hint = "search",
+            callback = openTruyenViet,
+        }
+        menu_items.truyenviet_tools = {
+            text = title_text,
+            sorting_hint = "tools",
+            callback = openTruyenViet,
+        }
+        menu_items.truyenviet_main = {
+            text = title_text,
+            sorting_hint = "main",
+            callback = openTruyenViet,
+        }
+        menu_items.truyenviet_continue_search = {
+            text = "📖 Truyện Việt: Tiếp tục đọc",
+            sorting_hint = "search",
+            callback = openContinue,
+        }
+        menu_items.truyenviet_continue_tools = {
+            text = "📖 Truyện Việt: Tiếp tục đọc",
+            sorting_hint = "tools",
+            callback = openContinue,
+        }
+    end
 end
 
 function TruyenViet:onStartTruyenViet()
