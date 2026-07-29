@@ -477,17 +477,6 @@ function Browser:showRoot()
             end,
         })
         table.insert(items, {
-            text = "📲 Nhận Truyện từ Điện Thoại/PC (send.nghiendoc.com)",
-            callback = function()
-                closeAndRun(view, function()
-                    local SendReceiver = require("truyenviet/send_receiver")
-                    SendReceiver:showReceiveDialog(function()
-                        self:showRoot()
-                    end)
-                end)
-            end,
-        })
-        table.insert(items, {
             text = "⚙️ Cài đặt Tải ngầm & Purge",
             callback = function()
                 closeAndRun(view, function()
