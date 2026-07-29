@@ -71,6 +71,8 @@ function StoryItem:init()
             self.story.cover_path = nil
         end
     end
+local FontHelper = require("truyenviet/font_helper")
+
     if not cover_widget then
         cover_widget = FrameContainer:new{
             width = cover_width,
@@ -79,7 +81,7 @@ function StoryItem:init()
                 dimen = Geom:new{ w = cover_width, h = cover_height },
                 TextWidget:new{
                     text = "No Cover",
-                    face = Font:getFace("smallinfofont", 16),
+                    face = FontHelper:getFace("smallinfofont", 16),
                     max_width = cover_width,
                 }
             }
@@ -88,7 +90,7 @@ function StoryItem:init()
 
     self.source_widget = TextWidget:new{
         text = self:getSourceText(),
-        face = Font:getFace("xx_smallinfofont"),
+        face = FontHelper:getFace("xx_smallinfofont"),
         max_width = text_width,
     }
 
@@ -96,7 +98,7 @@ function StoryItem:init()
         align = "left",
         TextWidget:new{
             text = self.story.title,
-            face = Font:getFace("smallinfofont", 22),
+            face = FontHelper:getFace("smallinfofont", 22),
             bold = true,
             max_width = text_width,
         },
