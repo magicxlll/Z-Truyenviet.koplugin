@@ -153,17 +153,31 @@ local function chapterIndex(self, story)
     end
 
     local story_url = config.url
-    local api_url = self.base_url .. "/wp-json/wp/v2/posts?categories=" .. config.cat_id .. "&per_page=100&_fields=link,title"
-    local raw_json = Http:get(api_url, stdHeaders(self.base_url))
-
     local chapters = {}
-    if raw_json then
-        local first_chapters = parseWpPosts(raw_json, self.base_url, self.id, story_url)
-        if first_chapters then
-            for _, ch in ipairs(first_chapters) do
-                table.insert(chapters, ch)
-            end
+    local p = 1
+
+    while p <= 50 do
+        local api_url = self.base_url .. "/wp-json/wp/v2/posts?categories=" .. config.cat_id .. "&per_page=100&_fields=link,title&page=" .. p
+        local raw_json = Http:get(api_url, stdHeaders(self.base_url))
+
+        if not raw_json or raw_json == "" or raw_json:find('"code":', 1, true) then
+            break
         end
+
+        local p_chaps = parseWpPosts(raw_json, self.base_url, self.id, story_url)
+        if not p_chaps or #p_chaps == 0 then
+            break
+        end
+
+        for _, ch in ipairs(p_chaps) do
+            table.insert(chapters, ch)
+        end
+
+        if #p_chaps < 100 then
+            break
+        end
+
+        p = p + 1
     end
 
     chapters = uniqueChapters(chapters)

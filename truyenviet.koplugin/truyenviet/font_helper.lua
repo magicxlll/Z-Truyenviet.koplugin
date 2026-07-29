@@ -4,31 +4,44 @@ local FontList = require("fontlist")
 local ffiutil = require("ffi/util")
 local util = require("util")
 
-local FontHelper = {}
+local FontHelper = {
+    _initialized = false
+}
 
 function FontHelper:setupComicFont()
     pcall(function()
         local data_dir = DataStorage:getDataDir()
         local plugin_font = ffiutil.joinPath(data_dir, "plugins/truyenviet.koplugin/fonts/ComicHelvetic-Light.ttf")
-        local user_font_dir = ffiutil.joinPath(data_dir, "fonts")
-        local user_font = ffiutil.joinPath(user_font_dir, "ComicHelvetic-Light.ttf")
+        
+        -- Các đường dẫn fonts của KOReader
+        local target_dirs = {
+            ffiutil.joinPath(data_dir, "fonts"),
+            "./fonts",
+            "/opt/lib/koreader/fonts",
+        }
 
-        -- 1. Sao chép font vào thư mục fonts của KOReader nếu chưa có
-        local f_check = io.open(user_font, "rb")
-        if f_check then
-            f_check:close()
-        else
-            local f_in = io.open(plugin_font, "rb")
-            if f_in then
-                local data = f_in:read("*all")
-                f_in:close()
-                util.makePath(user_font_dir)
-                local f_out = io.open(user_font, "wb")
-                if f_out then
-                    f_out:write(data)
-                    f_out:close()
+        local primary_target = ffiutil.joinPath(data_dir, "fonts/ComicHelvetic-Light.ttf")
+
+        for _, dir in ipairs(target_dirs) do
+            pcall(function()
+                util.makePath(dir)
+                local dest_path = ffiutil.joinPath(dir, "ComicHelvetic-Light.ttf")
+                local f_check = io.open(dest_path, "rb")
+                if f_check then
+                    f_check:close()
+                else
+                    local f_in = io.open(plugin_font, "rb")
+                    if f_in then
+                        local data = f_in:read("*all")
+                        f_in:close()
+                        local f_out = io.open(dest_path, "wb")
+                        if f_out then
+                            f_out:write(data)
+                            f_out:close()
+                        end
+                    end
                 end
-            end
+            end)
         end
 
         -- 2. Đăng ký ComicHelvetic-Light vào FontList và Font.fontmap của KOReader
@@ -37,7 +50,7 @@ function FontHelper:setupComicFont()
                 {
                     family = "ComicHelvetic-Light",
                     name = "ComicHelvetic-Light",
-                    path = user_font,
+                    path = primary_target,
                 }
             }
             if not util.tableContains(FontList.fontlist, "ComicHelvetic-Light.ttf") then
@@ -60,6 +73,18 @@ function FontHelper:setupComicFont()
             Font.fontmap.pgfont = "ComicHelvetic-Light.ttf"
         end
     end)
+    self._initialized = true
+end
+
+function FontHelper:getFace(alias, size)
+    if not self._initialized then
+        self:setupComicFont()
+    end
+    local ok, face = pcall(Font.getFace, Font, "ComicHelvetic-Light.ttf", size)
+    if ok and face then
+        return face
+    end
+    return Font:getFace(alias or "infofont", size)
 end
 
 return FontHelper
