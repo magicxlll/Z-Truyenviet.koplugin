@@ -98,11 +98,11 @@ function Source:search(query)
     -- Fallback matching by URL path
     if #stories == 0 then
         for slug in html:gmatch('/story/([%w%-]+)') do
-            if not seen[slug] and #slug > 3 and not slug:find("chuong") and not slug:find("chapter") then
+            if not seen[slug] and #slug > 3 then
                 seen[slug] = true
                 table.insert(stories, {
                     source_id = self.id,
-                    title = slug:gsub("%-", " "):gsub("(%a)([%w_']*)", function(first, rest) return first:upper() .. rest:lower() end),
+                    title = "Vireal · " .. slug,
                     url = self.base_url .. "/story/" .. slug,
                     cover_url = nil,
                     kind = "text",
@@ -115,30 +115,24 @@ function Source:search(query)
 end
 
 function Source:getCompleted(page)
+    local res = self:search("")
     return {
-        stories = self:search(""),
-        genres = {},
+        stories = res or {},
+        genres = self:getGenresList(),
         page = page or 1,
         total_pages = 1,
-        title = "Truyện mới nhất",
+        title = "Truyện Mới Cập Nhật",
     }
 end
 
 function Source:getHot(page)
-    local res = self:search("")
-    return {
-        stories = res or {},
-        genres = {},
-        page = page or 1,
-        total_pages = 1,
-        title = "Truyện Hot / Đề Cử",
-    }
+    return self:getCompleted(page)
 end
 
 function Source:getUpdating(page)
-    local res = self:search("")
-    return {
-        stories = res or {},
+    return self:getCompleted(page)
+end
+
 function Source:getGenresList()
     return {
         { name = "🔥 Truyện Hot / Đề Cử", section = "hot", url = self.base_url },
@@ -170,42 +164,27 @@ function Source:getStoryPage(story, page)
     if not html then return nil, err end
 
     html = normalizeHtml(html)
-    local story_slug = story_url:match("/story/([^/?]+)") or ""
-
     local chapters = {}
     local seen = {}
 
-    for name, slug in html:gmatch('"name"%s*:%s*"([^"]+)"%s*,%s*"slug"%s*:%s*"([^"]+)"') do
-        if not seen[slug] and (slug:find("chuong") or slug:find("chapter") or name:find("Chương")) then
+    for slug in html:gmatch('/story/[%w%-]+/([%w%-]+)') do
+        if not seen[slug] and (slug:find("chuong") or slug:find("chapter") or slug:match("^%d+$")) then
             seen[slug] = true
-            local chap_url = self.base_url .. "/story/" .. story_slug .. "/" .. slug
+            local num = tonumber(slug:match("%d+")) or #chapters + 1
             table.insert(chapters, {
-                title = Util.decodeHtml(Util.stripTags(name)),
-                url = chap_url,
+                title = "Chương " .. num,
+                url = story_url .. "/" .. slug,
+                number = num,
+                order = num,
                 source_id = self.id,
                 story_url = story.url,
-                kind = "text",
+                kind = self.kind,
             })
         end
     end
 
-    if #chapters == 0 then
-        for slug in html:gmatch('(chuong%-[%a%d%-]+)') do
-            if not seen[slug] then
-                seen[slug] = true
-                local chap_url = self.base_url .. "/story/" .. story_slug .. "/" .. slug
-                table.insert(chapters, {
-                    title = slug:gsub("%-", " "),
-                    url = chap_url,
-                    source_id = self.id,
-                    story_url = story.url,
-                    kind = "text",
-                })
-            end
-        end
-    end
+    table.sort(chapters, function(a, b) return a.number < b.number end)
 
-    story.details = self:getStoryDetails(story)
     return {
         story = story,
         chapters = chapters,
@@ -214,34 +193,26 @@ function Source:getStoryPage(story, page)
     }
 end
 
+function Source:getAllChapters(story)
+    local res = self:getStoryPage(story, 1)
+    return res and res.chapters or {}
+end
+
 function Source:getChapter(chapter)
-    local raw_html, err = Http:get(chapter.url, {
+    local html, err = Http:get(chapter.url, {
         ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
     })
-    if not raw_html then return nil, err end
+    if not html then return nil, err end
 
-    local norm_html = normalizeHtml(raw_html)
-    local title = norm_html:match('"name"%s*:%s*"([^"]-Chương[^"]-)"') or chapter.title
-
-    local pos = raw_html:find('\\u003cp') or raw_html:find('<p translate=') or raw_html:find('<p>')
-    if not pos then
-        return nil, "Không tìm thấy nội dung chương từ Vireal"
-    end
-
-    local chunk = raw_html:sub(pos, pos + 250000)
-    local end_pos = chunk:find('</script>') or #chunk
-    chunk = chunk:sub(1, end_pos)
-
-    local content = cleanVirealContent(chunk)
-    if not content or #content < 50 then
-        return nil, "Nội dung chương Vireal quá ngắn hoặc bị lỗi"
-    end
+    html = normalizeHtml(html)
+    local title = html:match('<h1[^>]*>([%s%S]-)</h1>') or chapter.title
+    local content = cleanVirealContent(html)
 
     return {
-        title = title,
+        title = Util.trim(Util.stripTags(title)),
         content = content,
-        chapter_url = chapter.url,
-        story_url = chapter.story_url,
+        url = chapter.url,
+        kind = self.kind,
     }
 end
 
