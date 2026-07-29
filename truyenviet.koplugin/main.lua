@@ -12,31 +12,8 @@ local TruyenViet = WidgetContainer:extend{
 }
 
 function TruyenViet:init()
-    -- Tự động cài đặt font mặc định ComicHelvetic-Light.ttf vào hệ thống KOReader nếu chưa có
-    pcall(function()
-        local DataStorage = require("datastorage")
-        local ffiutil = require("ffi/util")
-        local font_src = ffiutil.joinPath(DataStorage:getDataDir(), "plugins/truyenviet.koplugin/fonts/ComicHelvetic-Light.ttf")
-        local font_dest_dir = ffiutil.joinPath(DataStorage:getDataDir(), "fonts")
-        local font_dest = ffiutil.joinPath(font_dest_dir, "ComicHelvetic-Light.ttf")
-        
-        local f_dest = io.open(font_dest, "r")
-        if f_dest then
-            f_dest:close()
-        else
-            local f_src = io.open(font_src, "rb")
-            if f_src then
-                local content = f_src:read("*all")
-                f_src:close()
-                require("util").makePath(font_dest_dir)
-                local f_out = io.open(font_dest, "wb")
-                if f_out then
-                    f_out:write(content)
-                    f_out:close()
-                end
-            end
-        end
-    end)
+    local FontHelper = require("truyenviet/font_helper")
+    FontHelper:setupComicFont()
 
     if self.ui.name == "ReaderUI" then
         Reader:initializeFromReaderUI(self.ui)

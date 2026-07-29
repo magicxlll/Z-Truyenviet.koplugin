@@ -378,6 +378,7 @@ end
 
 function Browser:showRoot()
     Storage:initialize()
+    pcall(function() require("truyenviet/font_helper"):setupComicFont() end)
 
     local view
     local items = {}
