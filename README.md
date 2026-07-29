@@ -2,7 +2,6 @@
 
 Plugin KOReader thuần Lua đọc truyện chữ & truyện tranh đa nguồn:
 
-- **Kiến trúc Siêu Cào (Super Scraper Engine)**: Tự động phân tích & tạo nguồn mới từ bất kỳ URL web truyện nào.
 - Truyện chữ từ [truyenfull.live](https://truyenfull.live)
 - Truyện tranh từ [truyenqqko.com](https://truyenqqko.com)
 - Truyện tranh từ [dualeotruyenhn.com](https://dualeotruyenhn.com)
@@ -22,7 +21,7 @@ Plugin KOReader thuần Lua đọc truyện chữ & truyện tranh đa nguồn:
 - Truyện chữ từ [dualeotruyenfull.net](https://dualeotruyenfull.net)
 - Truyện chữ từ [truyenc.com](https://truyenc.com)
 - Truyện chữ từ [akaytruyen.com](https://akaytruyen.com)
-- Truyện chữ từ [conduongbachu.com](https://conduongbachu.com) (Trọn bộ 3752 chương & 3 Ngoại truyện)
+- Truyện chữ từ [conduongbachu.com](https://conduongbachu.com) 
 
 Plugin tải chương về thư mục dữ liệu KOReader rồi mở bằng trình đọc có sẵn:
 
@@ -32,7 +31,6 @@ Plugin tải chương về thư mục dữ liệu KOReader rồi mở bằng tr�
 ## Tính năng nổi bật (v3.7.0)
 
 - **🌐 Dán URL Web Truyện Tạo Nguồn Tự Động (Super Scraper Engine)**: Tự động phân tích OpenGraph, JSON-LD, cấu trúc HTML để sinh ra quy tắc nguồn mới tái sử dụng vĩnh viễn.
-- **🎨 User Patch Font ComicHelvetic**: Tích hợp nút cài đặt User Patch chuẩn của KOReader, áp dụng font `ComicHelvetic` mượt mà cho TOÀN BỘ giao diện & bộ đọc sách E-ink.
 - **🔄 Tự động Cập nhật Trực tiếp (Self-Updater)** từ GitHub Repository (`magicxlll/Z-Truyenviet.koplugin`). Tự động giữ nguyên 100% Lịch sử đọc, Tủ truyện, Cài đặt và File đã tải.
 - Chạm vào từng nguồn để mở ngay danh sách truyện đã hoàn thành.
 - Tìm riêng trong nguồn bằng nút kính lúp, lọc theo thể loại và chuyển trang ngay trên danh sách.
@@ -90,7 +88,7 @@ mục lục thay vì tải quá nhiều chương manga liên tiếp.
 
 ## Sử dụng
 
-- Chạm vào nguồn (như `TruyenFull`, `TruyenQQ`, `Hắc Ám Chi Các`, v.v.) để xem các truyện đã hoàn thành.
+- Chạm vào nguồn (như `TruyenFull`, `TruyenQQ`, `Hắc Ám Chi Các`, v.v.) để xem các truyện
 - Trong màn hình của một nguồn, dùng nút kính lúp để tìm kiếm; dùng `Thể loại`, `‹`, `›` ở thanh dưới để lọc và chuyển trang web.
 - Vuốt danh sách hoặc dùng phím chuyển trang để xem các truyện còn lại trong trang web hiện tại.
 - Chạm một truyện để mở danh sách chương.
