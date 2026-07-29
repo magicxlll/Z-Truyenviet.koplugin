@@ -1,1 +1,1 @@
-return "3.6.0 (BUILD-1335)"
+return "3.6.1 (BUILD-1336)"
