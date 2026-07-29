@@ -578,44 +578,72 @@ function Browser:showRoot()
                 end
             end,
         })
-        table.insert(items, {
+    table.insert(items, {
             text = "Kiểm tra cập nhật",
             callback = function()
                 local Http = require("truyenviet/http_client")
                 runOnline(function()
                     local res, err = withLoading("Đang kiểm tra cập nhật...", function()
-                        local response, req_err = Http:get("https://api.github.com/repos/magicxlll/Z-Truyenviet.koplugin/releases/latest")
-                        if not response then error(req_err or "Lỗi kết nối") end
-                        return response
+                        -- 1. Ưu tiên kiểm tra raw version.lua từ main branch
+                        local raw_ver = Http:get("https://raw.githubusercontent.com/magicxlll/Z-Truyenviet.koplugin/main/truyenviet.koplugin/truyenviet/version.lua")
+                        if raw_ver then
+                            local remote_v = raw_ver:match('return%s*["\']([^"\']+)["\']')
+                            if remote_v then
+                                return {
+                                    latest_version = remote_v,
+                                    download_url = "https://github.com/magicxlll/Z-Truyenviet.koplugin/raw/main/dist/truyenviet.koplugin.zip"
+                                }
+                            end
+                        end
+
+                        -- 2. Dự phòng kiểm tra qua API tags
+                        local tags_json = Http:get("https://api.github.com/repos/magicxlll/Z-Truyenviet.koplugin/tags")
+                        if tags_json then
+                            local tag_name = tags_json:match('"name"%s*:%s*"([^"]+)"')
+                            if tag_name then
+                                return {
+                                    latest_version = tag_name,
+                                    download_url = "https://github.com/magicxlll/Z-Truyenviet.koplugin/raw/main/dist/truyenviet.koplugin.zip"
+                                }
+                            end
+                        end
+
+                        -- 3. Dự phòng kiểm tra qua releases/latest
+                        local rel_json = Http:get("https://api.github.com/repos/magicxlll/Z-Truyenviet.koplugin/releases/latest")
+                        if rel_json then
+                            local tag_name = rel_json:match('"tag_name"%s*:%s*"([^"]+)"')
+                            local asset_url = rel_json:match('"browser_download_url"%s*:%s*"([^"]+%.zip)"')
+                            if tag_name then
+                                return {
+                                    latest_version = tag_name,
+                                    download_url = asset_url or "https://github.com/magicxlll/Z-Truyenviet.koplugin/raw/main/dist/truyenviet.koplugin.zip"
+                                }
+                            end
+                        end
+
+                        return nil, "Không thể kết nối máy chủ GitHub"
                     end)
+
                     if not res then
                         UIManager:show(ConfirmBox:new{
-            title = "Truyện Việt",
-            text = "Lỗi kết nối: " .. tostring(err),
+                            title = "Truyện Việt",
+                            text = "Lỗi kết nối: " .. tostring(err),
                             ok_text = "Đóng",
                         })
                         return
                     end
+
                     local current_version = Version
-                    local latest_version = res:match('"tag_name"%s*:%s*"v?([^"]+)"') or ""
-                    
+                    local latest_version = res.latest_version
+                    local asset_url = res.download_url
+
                     if latest_version ~= "" and latest_version ~= current_version then
                         UIManager:show(ConfirmBox:new{
-            title = "Truyện Việt",
-            text = string.format("Phiên bản mới: %s\nPhiên bản hiện tại: %s\n\nCó tải về và cài đặt cập nhật không?", latest_version, current_version),
+                            title = "Truyện Việt",
+                            text = string.format("Phiên bản mới: %s\nPhiên bản hiện tại: %s\n\nCó tải về và cài đặt cập nhật không?", latest_version, current_version),
                             ok_text = "Cập nhật",
                             ok_callback = function()
                                 UIManager:nextTick(function()
-                                    local asset_url = res:match('"browser_download_url"%s*:%s*"([^"]+%.zip)"')
-                                    if not asset_url then
-                                        UIManager:show(ConfirmBox:new{
-            title = "Truyện Việt",
-            text = "Không tìm thấy file cài đặt.",
-                                            ok_text = "Đóng",
-                                        })
-                                        return
-                                    end
-
                                     local dl_ok, dl_err = withLoading("Đang tải xuống bản cập nhật...", function()
                                         local body, download_err = Http:get(asset_url)
                                         if not body then
@@ -658,14 +686,14 @@ function Browser:showRoot()
 
                                     if dl_ok then
                                         UIManager:show(ConfirmBox:new{
-            title = "Truyện Việt",
-            text = "Cập nhật thành công! Vui lòng khởi động lại KOReader.",
+                                            title = "Truyện Việt",
+                                            text = "Cập nhật thành công! Vui lòng khởi động lại KOReader.",
                                             ok_text = "Đóng",
                                         })
                                     else
                                         UIManager:show(ConfirmBox:new{
-            title = "Truyện Việt",
-            text = "Cập nhật thất bại: " .. tostring(dl_err),
+                                            title = "Truyện Việt",
+                                            text = "Cập nhật thất bại: " .. tostring(dl_err),
                                             ok_text = "Đóng",
                                         })
                                     end
@@ -675,8 +703,8 @@ function Browser:showRoot()
                         })
                     else
                         UIManager:show(ConfirmBox:new{
-            title = "Truyện Việt",
-            text = "Bạn đang dùng phiên bản mới nhất (" .. current_version .. ")",
+                            title = "Truyện Việt",
+                            text = "Bạn đang dùng phiên bản mới nhất (" .. current_version .. ")",
                             ok_text = "Đóng",
                         })
                     end
@@ -710,19 +738,19 @@ function Browser:showRoot()
             end,
         })
     table.insert(items, {
-            text = "Giới thiệu",
+            text = "Giới thiệu & Font chữ",
             callback = function()
                 UIManager:show(TextViewer:new{
                     title = "Truyện Việt",
                     text = table.concat({
-                        "Đọc truyện trực tuyến trong KOReader.",
+                        "🔥 Truyện Việt cho KOReader v" .. Version,
+                        "Đọc truyện trực tuyến mượt mà trên máy đọc sách Kobo/Kindle/Android.",
                         "",
-                        "Nguồn truyện chữ: https://truyenfull.today/",
-                        "Nguồn truyện chữ: https://truyendich.vn/",
-                        "Nguồn truyện tranh: https://truyenqqko.com/",
-                        "Nguồn truyện tranh: https://dualeotruyenpt.com/",
-                        "Nguồn truyện tranh: https://cbunu.com/",
-                        "Nguồn truyện tranh: https://haccbl.xyz/",
+                        "🔤 Font chữ mặc định: ComicHelvetic-Light (ComicHelvetic-Light.ttf)",
+                        "Font chữ được tích hợp sẵn trong plugin, tự động cài đặt vào KOReader giúp hiển thị tiếng Việt mượt mà sắc nét trên màn hình E-ink.",
+                        "",
+                        "Nguồn truyện chữ: TruyenFull, Truyện Dịch AI, AkayTruyen, Con Đường Bá Chủ, v.v.",
+                        "Nguồn truyện tranh: TruyenQQ, Dưa Leo, Cbunu, Hắc Ám Chi Các, TVE-4U, v.v.",
                         "",
                         "Chương truyện được lưu vào thư mục truyenviet trong thư mục dữ liệu KOReader.",
                         "Nội dung và ảnh thuộc về các website nguồn và chủ sở hữu tương ứng.",
