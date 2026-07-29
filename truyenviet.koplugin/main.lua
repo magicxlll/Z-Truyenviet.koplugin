@@ -72,7 +72,7 @@ function TruyenViet:addToMainMenu(menu_items)
     if self.ui and self.ui.name == "ReaderUI" then
         menu_items.truyenviet_reader_tools = {
             text = title_text,
-            sorting_hint = "tools_settings",
+            sorting_hint = "tools",
             callback = openTruyenViet,
         }
     else

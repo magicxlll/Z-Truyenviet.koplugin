@@ -7,19 +7,195 @@ local Source = {
     name = "AkayTruyen",
     kind = "text",
     base_url = "https://akaytruyen.com",
+    reversed_chapters = true,
+    supports_login = true,
+    _cookies = nil,
+    _logged_in = false,
 }
 
+local function parseCookies(headers)
+    local cookies = {}
+    if not headers then
+        return cookies
+    end
+    local raw = headers["set-cookie"] or headers["Set-Cookie"]
+    if type(raw) == "string" then
+        for name, value in raw:gmatch("([%w_%-]+)=([^;,]+)") do
+            local lower_name = name:lower()
+            if lower_name ~= "expires"
+                    and lower_name ~= "path"
+                    and lower_name ~= "max-age"
+                    and lower_name ~= "domain"
+                    and lower_name ~= "samesite" then
+                cookies[name] = value
+            end
+        end
+    elseif type(raw) == "table" then
+        for _, cookie_string in ipairs(raw) do
+            local name, value = cookie_string:match("^%s*([^=]+)=([^;]*)")
+            if name then
+                cookies[name] = value
+            end
+        end
+    end
+    return cookies
+end
+
+local function mergeCookies(existing, incoming)
+    existing = existing or {}
+    for name, value in pairs(incoming or {}) do
+        existing[name] = value
+    end
+    return existing
+end
+
+local function cookieHeader(cookies)
+    local parts = {}
+    for name, value in pairs(cookies or {}) do
+        table.insert(parts, name .. "=" .. value)
+    end
+    table.sort(parts)
+    return #parts > 0 and table.concat(parts, "; ") or nil
+end
+
+local function isVipLocked(html)
+    return html
+        and (
+            html:match(
+                '<div[^>]-class=["\'][^"\']*access%-denied%-container'
+            )
+            or html:find("Chương này dành cho tài khoản VIP", 1, true)
+        )
+end
+
+local function vipError()
+    return "Chương VIP bị khóa. Hãy đăng nhập tài khoản AkayTruyen có quyền "
+        .. "VIP trong Quản lý nguồn. Plugin không thể tải nội dung nếu tài "
+        .. "khoản chưa được cấp quyền."
+end
+
 function Source:getCoverHeaders()
-    return {
+    local headers = {
         ["Referer"] = self.base_url .. "/",
         ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
     }
+    local cookie = cookieHeader(self._cookies)
+    if cookie then
+        headers["Cookie"] = cookie
+    end
+    return headers
 end
 
 -- Akay trả 500 cho trang truyện/chương khi gửi X-Requested-With. Giữ một
 -- bộ header HTML rõ ràng để mọi request đọc nội dung luôn giống trình duyệt.
 function Source:getPageHeaders()
     return self:getCoverHeaders()
+end
+
+function Source:updateCookies(headers)
+    self._cookies = mergeCookies(self._cookies, parseCookies(headers))
+end
+
+function Source:authGet(url)
+    local content, err, headers, code = Http:get(url, self:getPageHeaders())
+    self:updateCookies(headers)
+    return content, err, headers, code
+end
+
+function Source:authPost(url, body, headers, options)
+    local request_headers = self:getPageHeaders()
+    for name, value in pairs(headers or {}) do
+        request_headers[name] = value
+    end
+    local content, err, response_headers, code = Http:request(
+        "POST",
+        url,
+        body,
+        request_headers,
+        options
+    )
+    self:updateCookies(response_headers)
+    return content, err, response_headers, code
+end
+
+function Source:login(username, password)
+    if not username or username == "" or not password or password == "" then
+        return nil, "Email và mật khẩu không được để trống"
+    end
+
+    self._cookies = nil
+    self._logged_in = false
+    local login_html, login_err = self:authGet(self.base_url .. "/login")
+    if not login_html then
+        return nil, "Không thể tải trang đăng nhập: " .. tostring(login_err)
+    end
+
+    local csrf_token = login_html:match(
+        'name="_token"%s+value="([^"]+)"'
+    ) or login_html:match(
+        'name="_token"%s+value=\'([^\']+)\''
+    ) or login_html:match(
+        'name="csrf%-token"%s+content="([^"]+)"'
+    )
+    if not csrf_token then
+        return nil, "Không tìm thấy mã bảo vệ đăng nhập AkayTruyen"
+    end
+
+    local body = table.concat({
+        "_token=" .. ko_util.urlEncode(csrf_token),
+        "email=" .. ko_util.urlEncode(username),
+        "password=" .. ko_util.urlEncode(password),
+        "remember=1",
+    }, "&")
+    local _, post_err, response_headers, code = self:authPost(
+        self.base_url .. "/login",
+        body,
+        {
+            ["Content-Type"] = "application/x-www-form-urlencoded",
+            ["Referer"] = self.base_url .. "/login",
+        },
+        { redirect = false }
+    )
+
+    local location = response_headers
+        and (response_headers.location or response_headers.Location)
+        or ""
+    if not code or code < 300 or code >= 400
+            or location:find("/login", 1, true) then
+        return nil, "Đăng nhập AkayTruyen thất bại: "
+            .. tostring(post_err or "sai email/mật khẩu")
+    end
+
+    local account_html, account_err = self:authGet(self.base_url .. "/")
+    if not account_html then
+        return nil, "Không thể xác minh phiên đăng nhập: "
+            .. tostring(account_err)
+    end
+    local has_logout_form = account_html:match(
+        '<form[^>]-action="[^"]*/logout"'
+    ) ~= nil
+    if not has_logout_form then
+        return nil, "Đăng nhập AkayTruyen không thành công"
+    end
+
+    self._logged_in = true
+    return true
+end
+
+function Source:ensureLoggedIn()
+    if self._logged_in and cookieHeader(self._cookies) then
+        return true
+    end
+    local CredentialManager = require("truyenviet/credential_manager")
+    local credential = CredentialManager:getCredential(self.id)
+    if not credential then
+        return nil, "Chưa lưu tài khoản AkayTruyen"
+    end
+    return self:login(credential.username, credential.password)
+end
+
+function Source:isLoggedIn()
+    return self._logged_in == true
 end
 
 function Source:parseSearch(html)
@@ -83,9 +259,13 @@ end
 
 function Source:search(query)
     local encoded = ko_util.urlEncode(query):gsub("%%20", "+")
-    local html, err = Http:get(self.base_url .. "/tim-kiem?keyword=" .. encoded, self:getCoverHeaders())
+    local html, err = self:authGet(
+        self.base_url .. "/tim-kiem?keyword=" .. encoded
+    )
     if not html then
-        html, err = Http:get(self.base_url .. "/tim-kiem/?tukhoa=" .. encoded, self:getCoverHeaders())
+        html, err = self:authGet(
+            self.base_url .. "/tim-kiem/?tukhoa=" .. encoded
+        )
     end
     if not html then
         return nil, err
@@ -128,7 +308,7 @@ function Source:parseHomeSection(html, page, start_marker, end_marker, title)
 end
 
 function Source:getHomePage()
-    return Http:get(self.base_url .. "/", self:getCoverHeaders())
+    return self:authGet(self.base_url .. "/")
 end
 
 function Source:getCompleted(page)
@@ -182,7 +362,7 @@ function Source:getGenre(genre, page)
     if page > 1 then
         url = url .. "?page=" .. page
     end
-    local html, err = Http:get(url, self:getCoverHeaders())
+    local html, err = self:authGet(url)
     if not html then
         return nil, err
     end
@@ -214,7 +394,7 @@ function Source:parseStoryDetails(html)
 end
 
 function Source:getStoryDetails(story)
-    local html, err = Http:get(story.url, self:getPageHeaders())
+    local html, err = self:authGet(story.url)
     if not html then
         return nil, err
     end
@@ -324,7 +504,7 @@ function Source:getStoryPage(story, page)
     local story_url = story.url:gsub("%?.*$", "")
     local page_url = page == 1 and story_url or (story_url .. "?page=" .. page)
 
-    local html, err = Http:get(page_url, self:getPageHeaders())
+    local html, err = self:authGet(page_url)
     if not html then
         return nil, err
     end
@@ -334,7 +514,7 @@ end
 
 function Source:getAllChapters(story, progress_cb)
     local story_url = story.url:gsub("%?.*$", "")
-    local first_html, err = Http:get(story_url, self:getPageHeaders())
+    local first_html, err = self:authGet(story_url)
     if not first_html then return nil, err end
 
     local total_pages = tonumber(first_html:match('class="jump%-input[^"]*"[^>]-max="(%d+)"')) or 1
@@ -356,7 +536,7 @@ function Source:getAllChapters(story, progress_cb)
         if p == 1 then
             html = first_html
         else
-            html, page_err = Http:get(p_url, self:getPageHeaders())
+            html, page_err = self:authGet(p_url)
         end
         if not html then
             return nil, string.format(
@@ -392,6 +572,10 @@ function Source:getAllChapters(story, progress_cb)
 end
 
 function Source:parseChapter(html, chapter)
+    if isVipLocked(html) then
+        return nil, vipError()
+    end
+
     local chapter_title = html:match("<h[12][^>]*>([%s%S]-)</h[12]>")
 
     local content = html:match('<div[^>]-id="chapter%-content"[^>]*>([%s%S]-)</div>')
@@ -457,9 +641,24 @@ function Source:parseChapter(html, chapter)
 end
 
 function Source:getChapter(chapter)
-    local html, err = Http:get(chapter.url, self:getPageHeaders())
+    local html, err = self:authGet(chapter.url)
     if not html then
         return nil, err
+    end
+    if isVipLocked(html) and not self:isLoggedIn() then
+        local CredentialManager = require("truyenviet/credential_manager")
+        if CredentialManager:hasCredential(self.id) then
+            local logged_in, login_err = self:ensureLoggedIn()
+            if logged_in then
+                html, err = self:authGet(chapter.url)
+                if not html then
+                    return nil, err
+                end
+            else
+                return nil, vipError() .. "\nĐăng nhập thất bại: "
+                    .. tostring(login_err)
+            end
+        end
     end
     return self:parseChapter(html, chapter)
 end

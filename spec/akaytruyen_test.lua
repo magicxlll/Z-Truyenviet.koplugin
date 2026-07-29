@@ -7,13 +7,32 @@ package.path = table.concat({
 
 local requested_urls = {}
 local response_by_url = {}
+local headers_by_url = {}
 local last_headers = {}
+local last_post
 local Http = {}
 
 function Http:get(url, headers)
     requested_urls[#requested_urls + 1] = url
     last_headers = headers or {}
-    return response_by_url[url], response_by_url[url] and nil or "missing fixture"
+    return response_by_url[url],
+        response_by_url[url] and nil or "missing fixture",
+        headers_by_url[url],
+        response_by_url[url] and 200 or nil
+end
+
+function Http:request(method, url, body, headers, options)
+    last_post = {
+        method = method,
+        url = url,
+        body = body,
+        headers = headers,
+        options = options,
+    }
+    return nil, "redirect", {
+        location = "/",
+        ["set-cookie"] = "akay_session=session123; Path=/; HttpOnly",
+    }, 302
 end
 
 package.preload["truyenviet/http_client"] = function()
@@ -198,6 +217,77 @@ assertEqual(
     true,
     duplicate_err and duplicate_err:find("dữ liệu trùng", 1, true) ~= nil,
     "reports repeated pagination data"
+)
+
+local vip_html = [[
+    <h1>Chương 1: SỐ PHẬN!</h1>
+    <div id="chapter-content">
+      <div class="access-denied-container">
+        <h4>Truy cập bị hạn chế</h4>
+        <p>Chương này dành cho tài khoản VIP trở lên.</p>
+        <a href="/login">Đăng nhập</a>
+      </div>
+    </div>
+]]
+local public_chapter_with_lock_css = [[
+    <style>.access-denied-container { display: flex; }</style>
+    <h1>Chương công khai</h1>
+    <div id="chapter-content"><p>Nội dung công khai hợp lệ.</p></div>
+]]
+local public_result = assert(AkayTruyen:parseChapter(
+    public_chapter_with_lock_css,
+    {
+        title = "Chương công khai",
+        url = "https://akaytruyen.com/demo/chuong-cong-khai",
+    }
+))
+assertEqual(
+    true,
+    public_result.content:find("Nội dung công khai", 1, true) ~= nil,
+    "does not mistake shared VIP CSS for an actual lock screen"
+)
+
+local vip_result, vip_err = AkayTruyen:parseChapter(vip_html, {
+    title = "Chương 1: SỐ PHẬN!",
+    url = "https://akaytruyen.com/ngoai-truyen-chua-te-chi-lo/chuong-1-so-phan",
+})
+assertEqual(nil, vip_result, "does not save the VIP lock screen as chapter content")
+assertEqual(
+    true,
+    vip_err and vip_err:find("VIP", 1, true) ~= nil,
+    "explains that a valid VIP account is required"
+)
+
+response_by_url[AkayTruyen.base_url .. "/login"] = [[
+    <form action="/login" method="post">
+      <input type="hidden" name="_token" value="csrf123">
+    </form>
+]]
+headers_by_url[AkayTruyen.base_url .. "/login"] = {
+    ["set-cookie"] = "XSRF-TOKEN=token123; Path=/",
+}
+response_by_url[AkayTruyen.base_url .. "/"] = [[
+    <form action="https://akaytruyen.com/logout" method="post"></form>
+]]
+
+local login_ok, login_err = AkayTruyen:login(
+    "vip@example.com",
+    "secret"
+)
+assertEqual(true, login_ok, "accepts a verified Akay login session")
+assertEqual(nil, login_err, "does not return an error after login")
+assertEqual("POST", last_post.method, "submits the Akay login form")
+assertEqual(
+    true,
+    last_post.body:find("email=vip@example.com", 1, true) ~= nil,
+    "submits the account email"
+)
+assertEqual(
+    true,
+    last_post.headers.Cookie
+        and last_post.headers.Cookie:find("XSRF-TOKEN=token123", 1, true)
+            ~= nil,
+    "carries the CSRF session cookie into login"
 )
 
 print(string.format("AkayTruyen tests passed: %d assertions", assertions))

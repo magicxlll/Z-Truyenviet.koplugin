@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.3.7 (BUILD-1319) - 2026-07-29
+
+### Codex
+
+- Sửa crash khi chạm mép trên để mở menu trong ReaderUI: plugin từng dùng
+  `sorting_hint="tools_settings"`, không tồn tại trong
+  `reader_menu_order.lua`; chuyển sang menu `tools` hợp lệ và xác minh trực
+  tiếp bằng `MenuSorter` của KOReader.
+- Thay Sort chỉ đảo các chương của trang hiện tại bằng điều hướng toàn mục lục:
+  A-Z nhảy tới trang chứa chương đầu, Z-A nhảy tới trang chứa chương mới nhất.
+  Giữ đúng chiều khi chuyển trang và khi đọc tiếp qua ranh giới trang.
+- Đánh dấu Akay là nguồn có mục lục giảm dần và thêm module
+  `chapter_order.lua` để tính trang biên, chiều hiển thị và trang đọc kế tiếp.
+- Nhận diện màn hình khóa VIP theo markup thực tế, không lưu nó thành nội dung
+  chương. Tránh nhận nhầm CSS dùng chung là khóa VIP.
+- Thêm đăng nhập Akay hợp lệ bằng CSRF + session cookie, lưu tài khoản qua
+  CredentialManager và bổ sung mục quản lý tài khoản trong Quản lý nguồn.
+  Chương VIP vẫn yêu cầu tài khoản thực sự có quyền.
+- Kiểm tra live toàn bộ 6 chương *Ngoại Truyện - Chúa Tể Chi Lộ*: phiên công
+  khai chỉ nhận màn hình “Truy cập bị hạn chế”; plugin hiện báo rõ yêu cầu VIP.
+- Thêm regression test menu ReaderUI, chapter order, khóa VIP và phiên đăng
+  nhập. Tổng kiểm tra mục tiêu: 17 assertion sort, 26 assertion Akay và 34 file
+  Lua compile.
+
 ## 3.3.6 (BUILD-1318) - 2026-07-29
 
 ### Codex

@@ -14,6 +14,7 @@ local files = {
     "truyenviet.koplugin/main.lua",
     "truyenviet.koplugin/timerwheel.lua",
     "truyenviet.koplugin/truyenviet/browser.lua",
+    "truyenviet.koplugin/truyenviet/chapter_order.lua",
     "truyenviet.koplugin/truyenviet/chapter_downloader.lua",
     "truyenviet.koplugin/truyenviet/cover_cache.lua",
     "truyenviet.koplugin/truyenviet/debugger.lua",

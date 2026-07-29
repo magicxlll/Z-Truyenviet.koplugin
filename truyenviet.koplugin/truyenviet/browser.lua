@@ -11,6 +11,7 @@ local Trapper = require("ui/trapper")
 local UIManager = require("ui/uimanager")
 
 local Builder = require("truyenviet/document_builder")
+local ChapterOrder = require("truyenviet/chapter_order")
 local ChapterDownloader = require("truyenviet/chapter_downloader")
 local CoverCache = require("truyenviet/cover_cache")
 local CredentialManager = require("truyenviet/credential_manager")
@@ -22,6 +23,16 @@ local StoryResults = require("truyenviet/widgets/story_results")
 local Version = require("truyenviet/version")
 local Debug = require("truyenviet/debugger")
 local Util = require("truyenviet/helpers")
+
+local function autoOpenChapter(chapters, selection)
+    if type(selection) == "table" then
+        return selection
+    end
+    if selection == "last" then
+        return chapters[#chapters]
+    end
+    return chapters[1]
+end
 
 local ListView = Menu:extend{
     is_popout = false,
@@ -1634,6 +1645,27 @@ function Browser:showSourceActionDialog(source, on_return_callback, parent_view)
         },
     }
 
+    if source.supports_login and type(source.login) == "function" then
+        table.insert(action_buttons, 3, {
+            {
+                text = CredentialManager:hasCredential(source.id)
+                    and "👤 Tài khoản (Đã lưu)"
+                    or "👤 Đăng nhập tài khoản",
+                callback = function()
+                    closeAndRun(dlg, function()
+                        self:showSourceAccountMenu(source, function()
+                            self:showSourceActionDialog(
+                                source,
+                                on_return_callback,
+                                parent_view
+                            )
+                        end)
+                    end)
+                end,
+            },
+        })
+    end
+
     if is_custom then
         table.insert(action_buttons, {
             {
@@ -1727,7 +1759,7 @@ function Browser:getLocalChapters(story, source)
     return chapters
 end
 
-function Browser:loadStoryPage(story, source, page, on_return_callback, auto_open_chapter, from_reader)
+function Browser:loadStoryPage(story, source, page, on_return_callback, auto_open_chapter, from_reader, chapter_sort)
     local function loadOnline()
         runOnline(function()
             local page_data, err = withLoading(
@@ -1740,9 +1772,17 @@ function Browser:loadStoryPage(story, source, page, on_return_callback, auto_ope
                 showError(err, on_return_callback)
                 return
             end
+            ChapterOrder.apply(
+                page_data,
+                source,
+                chapter_sort or ChapterOrder.defaultMode(source)
+            )
             Storage:updateFavorite(page_data.story)
             if auto_open_chapter then
-                local chapter_to_open = type(auto_open_chapter) == "table" and auto_open_chapter or page_data.chapters[1]
+                local chapter_to_open = autoOpenChapter(
+                    page_data.chapters,
+                    auto_open_chapter
+                )
                 if chapter_to_open then
                     self:openChapter(nil, page_data, source, chapter_to_open, on_return_callback, false, from_reader)
                 else
@@ -1772,8 +1812,16 @@ function Browser:loadStoryPage(story, source, page, on_return_callback, auto_ope
                 total_pages = 1,
                 chapters = local_chapters,
             }
+            ChapterOrder.apply(
+                page_data,
+                source,
+                chapter_sort or ChapterOrder.defaultMode(source)
+            )
             if auto_open_chapter then
-                local chapter_to_open = type(auto_open_chapter) == "table" and auto_open_chapter or page_data.chapters[1]
+                local chapter_to_open = autoOpenChapter(
+                    page_data.chapters,
+                    auto_open_chapter
+                )
                 if chapter_to_open then
                     self:openChapter(nil, page_data, source, chapter_to_open, on_return_callback, false, from_reader)
                 else
@@ -2160,7 +2208,8 @@ end
 function Browser:showChapterList(page_data, source, on_return_callback)
     local story = page_data.story
     local view
-    local is_reversed = page_data.sort_reversed or false
+    local sort_mode = page_data.chapter_sort
+        or ChapterOrder.defaultMode(source)
     local items = {
         {
             text = Storage:isFavorite(story)
@@ -2176,17 +2225,27 @@ function Browser:showChapterList(page_data, source, on_return_callback)
             end,
         },
         {
-            text = is_reversed and "Thứ tự: Mới nhất trước (Z-A)" or "Thứ tự: Chương 1 trước (A-Z)",
+            text = sort_mode == "desc"
+                and "Thứ tự: Mới nhất trước (Z-A)"
+                or "Thứ tự: Chương 1 trước (A-Z)",
             mandatory = "Đổi thứ tự",
             callback = function()
-                page_data.sort_reversed = not is_reversed
-                local rev = {}
-                for i = #page_data.chapters, 1, -1 do
-                    table.insert(rev, page_data.chapters[i])
-                end
-                page_data.chapters = rev
+                local next_mode = sort_mode == "desc" and "asc" or "desc"
+                local target_page = ChapterOrder.targetPage(
+                    source,
+                    page_data.total_pages,
+                    next_mode
+                )
                 closeAndRun(view, function()
-                    self:showChapterList(page_data, source, on_return_callback)
+                    self:loadStoryPage(
+                        story,
+                        source,
+                        target_page,
+                        on_return_callback,
+                        false,
+                        nil,
+                        next_mode
+                    )
                 end)
             end,
         },
@@ -2217,22 +2276,41 @@ function Browser:showChapterList(page_data, source, on_return_callback)
             select_enabled = false,
         })
     end
-    if page_data.page > 1 then
+    local page_step = ChapterOrder.pageStep(source, sort_mode)
+    local previous_page = page_data.page - page_step
+    local next_page = page_data.page + page_step
+    if previous_page >= 1 and previous_page <= page_data.total_pages then
         table.insert(items, {
             text = "← Trang chương trước",
             callback = function()
                 closeAndRun(view, function()
-                    self:loadStoryPage(story, source, page_data.page - 1, on_return_callback)
+                    self:loadStoryPage(
+                        story,
+                        source,
+                        previous_page,
+                        on_return_callback,
+                        false,
+                        nil,
+                        sort_mode
+                    )
                 end)
             end,
         })
     end
-    if page_data.page < page_data.total_pages then
+    if next_page >= 1 and next_page <= page_data.total_pages then
         table.insert(items, {
             text = "Trang chương sau →",
             callback = function()
                 closeAndRun(view, function()
-                    self:loadStoryPage(story, source, page_data.page + 1, on_return_callback)
+                    self:loadStoryPage(
+                        story,
+                        source,
+                        next_page,
+                        on_return_callback,
+                        false,
+                        nil,
+                        sort_mode
+                    )
                 end)
             end,
         })
@@ -2280,6 +2358,8 @@ function Browser:openChapter(view, page_data, source, chapter, on_return_callbac
 
     self:triggerPrefetchAndPurge(source, story, page_data, chapter)
 
+    local chapter_sort = page_data.chapter_sort
+        or ChapterOrder.defaultMode(source)
     local next_chapter
     for i, c in ipairs(page_data.chapters) do
         local match = false
@@ -2294,11 +2374,9 @@ function Browser:openChapter(view, page_data, source, chapter, on_return_callbac
         end
         
         if match then
-            if source.reversed_chapters then
-                next_chapter = page_data.chapters[i - 1]
-            else
-                next_chapter = page_data.chapters[i + 1]
-            end
+            next_chapter = page_data.chapters[
+                ChapterOrder.nextChapterIndex(chapter_sort, i)
+            ]
             break
         end
     end
@@ -2317,21 +2395,37 @@ function Browser:openChapter(view, page_data, source, chapter, on_return_callbac
                         self:openChapter(nil, page_data, source, next_chapter, on_return_callback, false, from_reader_flag)
                     end
                 elseif page_data.total_pages > 1 then
-                    if source.reversed_chapters and page_data.page > 1 then
+                    local next_page = ChapterOrder.nextReadingPage(
+                        source,
+                        page_data.page,
+                        page_data.total_pages
+                    )
+                    if next_page then
+                        local auto_open = ChapterOrder.nextPageAutoOpen(
+                            chapter_sort
+                        )
                         if from_reader_flag then
                             Reader:returnToPlugin(function()
-                                self:loadStoryPage(story, source, page_data.page - 1, on_return_callback, true, from_reader_flag)
+                                self:loadStoryPage(
+                                    story,
+                                    source,
+                                    next_page,
+                                    on_return_callback,
+                                    auto_open,
+                                    from_reader_flag,
+                                    chapter_sort
+                                )
                             end)
                         else
-                            self:loadStoryPage(story, source, page_data.page - 1, on_return_callback, true, from_reader_flag)
-                        end
-                    elseif not source.reversed_chapters and page_data.page < page_data.total_pages then
-                        if from_reader_flag then
-                            Reader:returnToPlugin(function()
-                                self:loadStoryPage(story, source, page_data.page + 1, on_return_callback, true, from_reader_flag)
-                            end)
-                        else
-                            self:loadStoryPage(story, source, page_data.page + 1, on_return_callback, true, from_reader_flag)
+                            self:loadStoryPage(
+                                story,
+                                source,
+                                next_page,
+                                on_return_callback,
+                                auto_open,
+                                from_reader_flag,
+                                chapter_sort
+                            )
                         end
                     else
                         UIManager:show(InfoMessage:new{
@@ -2572,6 +2666,74 @@ function Browser:showPasswordDialog(source, username, on_success, on_cancel)
     }
     UIManager:show(dialog)
     dialog:onShowKeyboard()
+end
+
+function Browser:showSourceAccountMenu(source, on_return_callback)
+    local view
+    local items = {}
+    local credential = CredentialManager:getCredential(source.id)
+    local logged_in = type(source.isLoggedIn) == "function"
+        and source:isLoggedIn()
+
+    if credential then
+        table.insert(items, {
+            text = "Tài khoản: " .. tostring(credential.username),
+            dim = true,
+            select_enabled = false,
+        })
+        table.insert(items, {
+            text = logged_in
+                and "Trạng thái: Đã đăng nhập"
+                or "Trạng thái: Chưa xác minh phiên",
+            dim = true,
+            select_enabled = false,
+        })
+        table.insert(items, {
+            text = "Đăng nhập lại",
+            callback = function()
+                source._logged_in = false
+                source._cookies = nil
+                closeAndRun(view, function()
+                    self:showLoginDialog(
+                        source,
+                        on_return_callback,
+                        on_return_callback
+                    )
+                end)
+            end,
+        })
+        table.insert(items, {
+            text = "Xóa tài khoản đã lưu",
+            callback = function()
+                CredentialManager:removeCredential(source.id)
+                source._logged_in = false
+                source._cookies = nil
+                UIManager:show(Notification:new{
+                    text = "Đã xóa tài khoản " .. source.name,
+                })
+                closeAndRun(view, on_return_callback)
+            end,
+        })
+    else
+        table.insert(items, {
+            text = "Đăng nhập",
+            callback = function()
+                closeAndRun(view, function()
+                    self:showLoginDialog(
+                        source,
+                        on_return_callback,
+                        on_return_callback
+                    )
+                end)
+            end,
+        })
+    end
+
+    view = showView(
+        source.name .. " · Tài khoản",
+        items,
+        on_return_callback
+    )
 end
 
 function Browser:browseEbookSource(source, on_return_callback)
