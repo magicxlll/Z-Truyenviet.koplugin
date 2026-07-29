@@ -1,6 +1,7 @@
 local Http = require("truyenviet/http_client")
 local Util = require("truyenviet/helpers")
 local ko_util = require("util")
+local json = require("json")
 
 local Source = {
     id = "akaytruyen",
@@ -9,9 +10,12 @@ local Source = {
     base_url = "https://akaytruyen.com",
     reversed_chapters = true,
     supports_login = true,
+    -- Akay chapter pages are large. Keep rolling prefetch cooperative and
+    -- strictly serial so it cannot saturate the single-threaded reader UI.
+    max_concurrent = 1,
     _cookies = nil,
     _logged_in = false,
-    _home_cache = nil,
+    _home_data = nil,
     _home_cache_time = 0,
 }
 
@@ -82,6 +86,17 @@ end
 
 function Source:authGet(url)
     local content, err, headers, code = Http:get(url, self:getPageHeaders())
+    self:updateCookies(headers)
+    return content, err, headers, code
+end
+
+function Source:authGetAsync(url)
+    local content, err, headers, code = Http:requestAsync(
+        "GET",
+        url,
+        nil,
+        self:getPageHeaders()
+    )
     self:updateCookies(headers)
     return content, err, headers, code
 end
@@ -157,51 +172,99 @@ function Source:isLoggedIn()
     return self._logged_in == true
 end
 
--- Tự động bóc tách truyện cực nhanh từ HTML (Tối ưu hóa tránh treo UI)
-function Source:parseSearch(html)
-    if not html or #html < 100 then return {} end
+local function canonicalStoryUrl(base_url, href)
+    if not href or not href:find("/truyen/", 1, true) then return nil end
+    local full_url = Util.absoluteUrl(base_url, href)
+    if not full_url then return nil end
+    return full_url:gsub("#.*$", ""):gsub("%?.*$", ""):gsub("/+$", "")
+end
+
+local function cleanStoryTitle(raw)
+    local title = Util.trim(Util.stripTags(raw or "")):gsub("%s+", " ")
+    title = title:gsub("%s+Full%s*$", "")
+        :gsub("%s+Hot%s*$", "")
+        :gsub("%s+New%s*$", "")
+        :gsub("%s+Đang viết%s*$", "")
+    return Util.trim(title)
+end
+
+-- Akay uses separate anchors for image and title in several listings. Merge
+-- all information for the same canonical URL before emitting a story.
+local function parseStoryAnchors(source, html)
+    local entries = {}
+    local ordered_urls = {}
+
+    for attrs, body in tostring(html or ""):gmatch("<a([^>]*)>([%s%S]-)</a>") do
+        local url = canonicalStoryUrl(
+            source.base_url,
+            Util.getAttribute(attrs, "href")
+        )
+        if url then
+            local entry = entries[url]
+            if not entry then
+                entry = {
+                    source_id = source.id,
+                    url = url,
+                    kind = source.kind,
+                    _title_rank = 0,
+                }
+                entries[url] = entry
+                ordered_urls[#ordered_urls + 1] = url
+            end
+
+            local cover = body:match('data%-src%s*=%s*"([^"]+)"')
+                or body:match("data%-src%s*=%s*'([^']+)'")
+                or body:match('src%s*=%s*"([^"]+)"')
+                or body:match("src%s*=%s*'([^']+)'")
+            if cover and not entry.cover_url then
+                entry.cover_url = Util.absoluteUrl(source.base_url, cover)
+            end
+
+            local class_attr = Util.getAttribute(attrs, "class") or ""
+            local attribute_title = Util.getAttribute(attrs, "title")
+            local image_alt = body:match('<img[^>]-alt%s*=%s*"([^"]+)"')
+                or body:match("<img[^>]-alt%s*=%s*'([^']+)'")
+            local title
+            local title_rank = 0
+
+            if class_attr:find("story-name", 1, true)
+                    or class_attr:find("story-title", 1, true)
+                    or class_attr:find("title-text-story", 1, true) then
+                title = cleanStoryTitle(body)
+                title_rank = 4
+            elseif attribute_title and attribute_title ~= "" then
+                title = cleanStoryTitle(attribute_title)
+                title_rank = 3
+            elseif image_alt and image_alt ~= "" then
+                title = cleanStoryTitle(image_alt)
+                title_rank = 2
+            else
+                title = cleanStoryTitle(body)
+                title_rank = 1
+            end
+
+            if title ~= ""
+                    and title_rank >= entry._title_rank
+                    and not title:find("^Thể loại") then
+                entry.title = Util.decodeHtml(title)
+                entry._title_rank = title_rank
+            end
+        end
+    end
+
     local stories = {}
-    local seen = {}
-
-    -- Quét nhanh theo mẫu đường dẫn /truyen/
-    for href, title_html in html:gmatch('href=["\'](https?://akaytruyen%.com/truyen/[^"\'%?#]+)["\'][^>]*>([%s%S]-)</a>') do
-        if not seen[href] then
-            local title = Util.trim(Util.stripTags(title_html)):gsub("%s+", " ")
-            if #title > 1 and not title:find("^Truyện") and not title:find("^Thể loại") then
-                seen[href] = true
-                -- Tìm ảnh bìa trong cùng khối HTML
-                local img_src = title_html:match('src="([^"]+)"') or title_html:match('data%-src="([^"]+)"')
-                table.insert(stories, {
-                    source_id = self.id,
-                    title = Util.decodeHtml(title),
-                    url = href,
-                    cover_url = img_src and Util.absoluteUrl(self.base_url, img_src) or nil,
-                    kind = self.kind,
-                })
-            end
+    for _, url in ipairs(ordered_urls) do
+        local entry = entries[url]
+        if entry.title and entry.title ~= "" then
+            entry._title_rank = nil
+            stories[#stories + 1] = entry
         end
     end
-
-    -- Fallback quét href tương đối /truyen/
-    if #stories == 0 then
-        for rel_href in html:gmatch('href=["\'](/truyen/[^"\'%?#]+)["\']') do
-            local full_url = Util.absoluteUrl(self.base_url, rel_href)
-            if not seen[full_url] then
-                seen[full_url] = true
-                local slug = rel_href:match("([^/]+)$") or "truyen"
-                local clean_title = slug:gsub("%-", " "):gsub("^%l", string.upper)
-                table.insert(stories, {
-                    source_id = self.id,
-                    title = clean_title,
-                    url = full_url,
-                    cover_url = nil,
-                    kind = self.kind,
-                })
-            end
-        end
-    end
-
     return stories
+end
+
+function Source:parseSearch(html)
+    return parseStoryAnchors(self, html)
 end
 
 function Source:search(query)
@@ -225,31 +288,19 @@ function Source:parseListing(html, page)
     }
 end
 
--- Bộ nhớ đệm Trang Chủ (Cache 900KB HTML 120s tránh tải đi tải lại làm treo KOReader)
-function Source:getHomePage()
-    local now = os.time()
-    if self._home_cache and (now - self._home_cache_time) < 120 then
-        return self._home_cache
-    end
-
-    local html, err = self:authGet(self.base_url .. "/")
-    if html then
-        self._home_cache = html
-        self._home_cache_time = now
-    end
-    return html, err
-end
-
 local function extractHomeSection(html, start_marker, end_marker)
     if not html then return "" end
     local start_at = html:find(start_marker, 1, true)
-    if not start_at then return html end
+    if not start_at then return "" end
     local end_at = end_marker and html:find(end_marker, start_at + #start_marker, true)
     return html:sub(start_at, (end_at and end_at - 1) or #html)
 end
 
 function Source:parseHomeSection(html, page, start_marker, end_marker, title)
     local section_html = extractHomeSection(html, start_marker, end_marker)
+    if section_html == "" then
+        return nil, "Không tìm thấy mục '" .. title .. "' trên AkayTruyen"
+    end
     return {
         stories = self:parseSearch(section_html),
         genres = Util.parseGenres(html, self.base_url),
@@ -259,25 +310,106 @@ function Source:parseHomeSection(html, page, start_marker, end_marker, title)
     }
 end
 
+local function copyItems(items)
+    local result = {}
+    for index, item in ipairs(items or {}) do
+        local copied = {}
+        for key, value in pairs(item) do copied[key] = value end
+        result[index] = copied
+    end
+    return result
+end
+
+function Source:parseHomeData(html)
+    local hot_html = extractHomeSection(
+        html,
+        '<div class="section-stories-hot',
+        '<div class="section-stories-new'
+    )
+    local updating_html = extractHomeSection(
+        html,
+        '<div class="section-stories-new',
+        '<div class="section-stories-full'
+    )
+    local completed_html = extractHomeSection(
+        html,
+        '<div class="section-stories-full',
+        '<div id="id_feedback_button"'
+    )
+    if hot_html == "" or updating_html == "" or completed_html == "" then
+        return nil, "Trang chủ AkayTruyen đã đổi cấu trúc danh sách"
+    end
+
+    local hot = parseStoryAnchors(self, hot_html)
+    local updating = parseStoryAnchors(self, updating_html)
+    local completed = parseStoryAnchors(self, completed_html)
+    local cover_by_url = {}
+    for _, group in ipairs({ hot, completed }) do
+        for _, story in ipairs(group) do
+            if story.cover_url then cover_by_url[story.url] = story.cover_url end
+        end
+    end
+    for _, story in ipairs(updating) do
+        story.cover_url = story.cover_url or cover_by_url[story.url]
+    end
+
+    return {
+        hot = hot,
+        updating = updating,
+        completed = completed,
+        genres = Util.parseGenres(html, self.base_url),
+    }
+end
+
+-- Cache parsed results, not the roughly 900 KB homepage HTML.
+function Source:getHomeData()
+    local now = os.time()
+    if self._home_data and (now - self._home_cache_time) < 120 then
+        return self._home_data
+    end
+
+    local html, err = self:authGet(self.base_url .. "/")
+    if not html then return nil, err end
+    local data, parse_err = self:parseHomeData(html)
+    if not data then return nil, parse_err end
+    self._home_data = data
+    self._home_cache_time = now
+    return data
+end
+
+function Source:getHomePage()
+    return self:authGet(self.base_url .. "/")
+end
+
+local function homeListing(data, key, page, title)
+    return {
+        stories = copyItems(data[key]),
+        genres = copyItems(data.genres),
+        page = page or 1,
+        total_pages = 1,
+        title = title,
+    }
+end
+
 function Source:getCompleted(page)
     page = page or 1
-    local html, err = self:getHomePage()
-    if not html then return nil, err end
-    return self:parseHomeSection(html, page, 'section-stories-full', 'id_feedback_button', "Truyện hoàn thành")
+    local data, err = self:getHomeData()
+    if not data then return nil, err end
+    return homeListing(data, "completed", page, "Truyện hoàn thành")
 end
 
 function Source:getHot(page)
     page = page or 1
-    local html, err = self:getHomePage()
-    if not html then return nil, err end
-    return self:parseHomeSection(html, page, 'section-stories-hot', 'section-stories-new', "Truyện hot")
+    local data, err = self:getHomeData()
+    if not data then return nil, err end
+    return homeListing(data, "hot", page, "Truyện hot")
 end
 
 function Source:getUpdating(page)
     page = page or 1
-    local html, err = self:getHomePage()
-    if not html then return nil, err end
-    return self:parseHomeSection(html, page, 'section-stories-new', 'section-stories-full', "Truyện mới cập nhật")
+    local data, err = self:getHomeData()
+    if not data then return nil, err end
+    return homeListing(data, "updating", page, "Truyện mới cập nhật")
 end
 
 function Source:getGenre(genre, page)
@@ -315,97 +447,205 @@ function Source:getStoryDetails(story)
     return self:parseStoryDetails(html)
 end
 
-function Source:parseStoryPage(html, story, page)
-    if not html then return { story = story, chapters = {}, page = page or 1, total_pages = 1 } end
+local function chapterPageCount(html)
+    local total_pages = 1
+    for input_tag in tostring(html or ""):gmatch("<input[^>]*>") do
+        local class_attr = Util.getAttribute(input_tag, "class") or ""
+        if class_attr:find("jump-input", 1, true) then
+            total_pages = math.max(
+                total_pages,
+                tonumber(Util.getAttribute(input_tag, "max")) or 1
+            )
+        end
+    end
+    if total_pages == 1 then
+        for value in tostring(html or ""):gmatch("page=(%d+)") do
+            total_pages = math.max(total_pages, tonumber(value) or 1)
+        end
+    end
+    return total_pages
+end
+
+function Source:parseStoryPage(html, story, page, include_details)
+    if not html then
+        return {
+            story = story,
+            chapters = {},
+            page = page or 1,
+            total_pages = 1,
+        }
+    end
 
     local chapters = {}
     local seen = {}
-    local story_url_clean = story.url:gsub("%?.*$", ""):gsub("/$", "")
+    local story_url_clean = story.url:gsub("#.*$", "")
+        :gsub("%?.*$", "")
+        :gsub("/+$", "")
     local story_slug = story_url_clean:match("([^/]+)$") or ""
+    local chapter_prefix = self.base_url:gsub("/+$", "")
+        .. "/"
+        .. story_slug
+        .. "/"
 
-    -- Quét nhanh các liên kết chương
-    for href, anchor_html in html:gmatch('<a[^>]+href=["\']([^"\'%?#]+)["\'][^>]*>([%s%S]-)</a>') do
-        if href:find(story_slug, 1, true) and (href:find("/chuong-") or href:find("/chapter-") or href:find("/c-") or href:match("/%d+$")) then
-            local abs_href = Util.absoluteUrl(self.base_url, href)
-            if not seen[abs_href] then
-                seen[abs_href] = true
-                local title = Util.decodeHtml(Util.trim(Util.stripTags(anchor_html):gsub("%s+", " ")))
-                if title == "" then title = "Chương " .. (#chapters + 1) end
-                table.insert(chapters, {
-                    title = title,
-                    url = abs_href,
+    for attrs, body in html:gmatch("<a([^>]*)>([%s%S]-)</a>") do
+        local href = Util.getAttribute(attrs, "href")
+        if href then
+            local chapter_url = Util.absoluteUrl(self.base_url, href)
+            chapter_url = chapter_url
+                and chapter_url:gsub("#.*$", ""):gsub("%?.*$", ""):gsub("/+$", "")
+            local class_attr = Util.getAttribute(attrs, "class") or ""
+            local normalized_class = " " .. class_attr:gsub("%s+", " ") .. " "
+            local is_chapter_anchor = normalized_class:find(
+                " chapter-link-mobile ",
+                1,
+                true
+            ) ~= nil
+                or body:find("chapter-number", 1, true) ~= nil
+                or body:find("chapter-title", 1, true) ~= nil
+            local has_prefix = chapter_url
+                and chapter_url:sub(1, #chapter_prefix) == chapter_prefix
+            local tail = has_prefix
+                and chapter_url:sub(#chapter_prefix + 1)
+                or ""
+            local is_single_segment = tail ~= ""
+                and not tail:find("/", 1, true)
+
+            if is_chapter_anchor
+                    and is_single_segment
+                    and not seen[chapter_url] then
+                seen[chapter_url] = true
+                local number_html = body:match(
+                    '<div[^>]-class="[^"]*chapter%-number[^"]*"[^>]*>'
+                        .. "([%s%S]-)</div>"
+                )
+                local title_html = body:match(
+                    '<div[^>]-class="[^"]*chapter%-title[^"]*"[^>]*>'
+                        .. "([%s%S]-)</div>"
+                )
+                local number = cleanStoryTitle(number_html)
+                local title_part = cleanStoryTitle(title_html)
+                local title
+                if number ~= "" and title_part ~= "" then
+                    title = number .. ": " .. title_part
+                elseif number ~= "" then
+                    title = number
+                elseif title_part ~= "" then
+                    title = title_part
+                else
+                    title = cleanStoryTitle(body)
+                end
+                if title == "" then
+                    title = Util.getAttribute(attrs, "title") or "Chương"
+                end
+
+                chapters[#chapters + 1] = {
+                    title = Util.decodeHtml(title),
+                    url = chapter_url,
                     source_id = self.id,
                     story_url = story.url,
                     kind = self.kind,
-                })
+                }
             end
         end
     end
 
-    local total_pages = tonumber(html:match('class="jump%-input[^"]*"[^>]-max="(%d+)"')) or 1
-    if total_pages == 1 then
-        for p in html:gmatch('page=(%d+)') do
-            total_pages = math.max(total_pages, tonumber(p) or 1)
-        end
-    end
-
-    story.details = self:parseStoryDetails(html)
+    if include_details then story.details = self:parseStoryDetails(html) end
     return {
         story = story,
         chapters = chapters,
         page = page or 1,
-        total_pages = total_pages,
+        total_pages = chapterPageCount(html),
     }
+end
+
+local function chapterEndpoint(story, page)
+    local story_url = story.url:gsub("#.*$", "")
+        :gsub("%?.*$", "")
+        :gsub("/+$", "")
+    return story_url .. "/search-chapters?search=&page=" .. tostring(page or 1)
+end
+
+local function decodeChapterFragment(raw)
+    local ok, payload = pcall(json.decode, raw)
+    if ok and type(payload) == "table" and type(payload.html) == "string" then
+        return payload.html
+    end
+    return nil, "Phản hồi danh sách chương AkayTruyen không hợp lệ"
+end
+
+function Source:getChapterListHtml(story, page)
+    page = page or 1
+    local raw, endpoint_err = self:authGet(chapterEndpoint(story, page))
+    if raw then
+        local fragment, decode_err = decodeChapterFragment(raw)
+        if fragment then return fragment, nil, false end
+        endpoint_err = decode_err
+    end
+
+    -- Compatibility fallback for a temporary endpoint/server regression.
+    local story_url = story.url:gsub("#.*$", ""):gsub("%?.*$", "")
+    local page_url = page == 1 and story_url or (story_url .. "?page=" .. page)
+    local html, page_err = self:authGet(page_url)
+    if html then return html, nil, true end
+    return nil, page_err or endpoint_err
 end
 
 function Source:getStoryPage(story, page)
     page = page or 1
-    local story_url = story.url:gsub("%?.*$", "")
-    local page_url = page == 1 and story_url or (story_url .. "?page=" .. page)
-
-    local html, err = self:authGet(page_url)
+    local html, err, used_full_page = self:getChapterListHtml(story, page)
     if not html then return nil, err end
-
-    return self:parseStoryPage(html, story, page)
+    return self:parseStoryPage(html, story, page, used_full_page)
 end
 
 function Source:getAllChapters(story, progress_cb)
-    local story_url = story.url:gsub("%?.*$", "")
-    local first_html, err = self:authGet(story_url)
+    local first_html, err = self:getChapterListHtml(story, 1)
     if not first_html then return nil, err end
-
-    local total_pages = tonumber(first_html:match('class="jump%-input[^"]*"[^>]-max="(%d+)"')) or 1
-    if total_pages == 1 then
-        for p in first_html:gmatch('page=(%d+)') do
-            total_pages = math.max(total_pages, tonumber(p) or 1)
-        end
-    end
-
-    -- Giới hạn tối đa 30 trang để tránh làm treo KOReader khi bộ truyện quá dài
-    total_pages = math.min(total_pages, 30)
-
+    local total_pages = chapterPageCount(first_html)
     local all_chapters = {}
     local seen_chapter_urls = {}
-    for p = 1, total_pages do
+
+    for page = 1, total_pages do
         if progress_cb then
-            progress_cb(string.format("Lấy danh sách chương trang %d/%d...", p, total_pages))
-        end
-        local p_url = p == 1 and story_url or (story_url .. "?page=" .. p)
-        local html
-        if p == 1 then
-            html = first_html
-        else
-            html = self:authGet(p_url)
+            progress_cb(string.format(
+                "Lấy danh sách chương trang %d/%d...",
+                page,
+                total_pages
+            ))
         end
 
-        if html then
-            local page_res = self:parseStoryPage(html, story, p)
-            for _, ch in ipairs(page_res.chapters) do
-                if not seen_chapter_urls[ch.url] then
-                    seen_chapter_urls[ch.url] = true
-                    table.insert(all_chapters, ch)
-                end
+        local html, page_err
+        if page == 1 then
+            html = first_html
+        else
+            html, page_err = self:getChapterListHtml(story, page)
+        end
+        if not html then
+            return nil, string.format(
+                "Không thể lấy danh sách chương trang %d/%d: %s",
+                page,
+                total_pages,
+                tostring(page_err or "lỗi không xác định")
+            )
+        end
+
+        local parsed = self:parseStoryPage(html, story, page)
+        if #parsed.chapters == 0 then
+            return nil, string.format(
+                "Trang chương %d/%d không có dữ liệu; đã hủy để tránh tải thiếu",
+                page,
+                total_pages
+            )
+        end
+        for _, chapter in ipairs(parsed.chapters) do
+            if seen_chapter_urls[chapter.url] then
+                return nil, string.format(
+                    "Trang chương %d/%d trả dữ liệu trùng; đã hủy để tránh tải thiếu",
+                    page,
+                    total_pages
+                )
             end
+            seen_chapter_urls[chapter.url] = true
+            all_chapters[#all_chapters + 1] = chapter
         end
     end
 
@@ -416,9 +656,38 @@ function Source:parseChapter(html, chapter)
     if isVipLocked(html) then return nil, vipError() end
     if not html or #html < 50 then return nil, "Không nhận được nội dung từ AkayTruyen" end
 
-    local chapter_title = html:match("<h[12][^>]*>([%s%S]-)</h[12]>")
+    local chapter_title = html:match(
+        '<h1[^>]-class=["\'][^"\']*custom%-text[^"\']*["\'][^>]*>'
+            .. "([%s%S]-)</h1>"
+    ) or html:match("<h[12][^>]*>([%s%S]-)</h[12]>")
 
-    local content = html:match('<div[^>]-id="chapter%-content"[^>]*>([%s%S]-)</div>')
+    local content
+    local content_id_at = html:find('id="chapter-content"', 1, true)
+        or html:find("id='chapter-content'", 1, true)
+    if content_id_at then
+        local content_start = html:find(">", content_id_at, true)
+        if content_start then
+            content_start = content_start + 1
+            local nav_start = html:find(
+                '<div class="chapter-nav',
+                content_start,
+                true
+            ) or html:find(
+                "<div class='chapter-nav",
+                content_start,
+                true
+            )
+            if nav_start then
+                content = html:sub(content_start, nav_start - 1)
+                -- Remove only the chapter-content wrapper's final closing tag.
+                content = content:gsub("%s*</div>%s*$", "")
+            end
+        end
+    end
+
+    -- Layout fallback for old or temporarily changed Akay templates.
+    content = content
+        or html:match('<div[^>]-id="chapter%-content"[^>]*>([%s%S]-)</div>')
         or html:match('<div[^>]-class="[^"]*chapter%-content[^"]*"[^>]*>([%s%S]-)</div>')
         or html:match('<div[^>]-id="chapter%-c"[^>]*>([%s%S]-)</div>')
         or html:match('<div[^>]-class="[^"]*content%-chap[^"]*"[^>]*>([%s%S]-)</div>')
@@ -450,6 +719,12 @@ function Source:getChapter(chapter)
             end
         end
     end
+    return self:parseChapter(html, chapter)
+end
+
+function Source:getChapterAsync(chapter)
+    local html, err = self:authGetAsync(chapter.url)
+    if not html then return nil, err end
     return self:parseChapter(html, chapter)
 end
 

@@ -47,6 +47,19 @@ Plugin tải chương về thư mục dữ liệu KOReader rồi mở bằng tr�
 - Gửi **Báo lỗi (Error Reporting)** lên Github trực tiếp từ Kobo nếu có sự cố.
 - Menu plugin và thư mục chương đã tải vẫn mở được khi offline.
 
+### Build kiểm thử AkayTruyen
+
+`v3.7.0 BUILD-1341` giữ nguyên toàn bộ phiên bản ổn định và chỉ tối ưu nguồn
+AkayTruyen:
+
+- Hot, Đang ra và Hoàn thành dùng chung một lần tải trang chủ; cover được ghép
+  theo URL nên Đang ra/Hoàn thành không còn hàng trống ảnh.
+- Mục lục dùng endpoint chapter fragment nhẹ của Akay, có fallback an toàn.
+- Tải trước chương chạy bất đồng bộ từng request một để không khóa giao diện
+  KOReader khi vừa mở trang đọc.
+- Live smoke test: 36/36 Hot, 32/32 Đang ra, 4/4 Hoàn thành và 18/18 truyện
+  chủ đề có cover; *Chung Cực Truyền Kỳ* đủ 324 chương trên 7 trang.
+
 ## Ảnh chụp màn hình
 
 | Trang chính | Danh sách truyện có ảnh bìa |
@@ -150,6 +163,7 @@ Chạy kiểm thử parser độc lập:
 
 ```sh
 luajit spec/akaytruyen_test.lua
+luajit scripts/akaytruyen_live_test.lua
 luajit spec/conduongbachu_test.lua
 luajit spec/cover_cache_test.lua
 luajit spec/search_service_test.lua
@@ -218,14 +232,14 @@ Kết quả đúng có dạng:
 
 ```text
 Parser tests passed: 49 assertions
-AkayTruyen tests passed: 10 assertions
+AkayTruyen tests passed: 39 assertions
 Chapter downloader tests passed: 5 assertions
 Storage tests passed: 19 assertions
 Story results tests passed: 18 assertions
 Reader tests passed: 10 assertions
 Document builder tests passed: 6 assertions
 Image utils tests passed: 4 assertions
-Lua compile tests passed: 19 files
+Lua compile tests passed: 35 files
 ```
 
 Sau đó tạo gói cài:

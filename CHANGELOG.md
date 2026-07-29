@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.7.0 (BUILD-1341) - 2026-07-29
+
+### Codex
+
+- Giữ nguyên phiên bản ổn định `3.7.0`, chỉ tăng internal build từ 1340 lên
+  1341 để đối chiếu kiểm thử tối ưu riêng nguồn AkayTruyen.
+- Parse trang chủ đúng ba DOM section một lần, cache dữ liệu đã bóc tách thay
+  vì giữ HTML gần 900 KB. Gom anchor ảnh/title theo URL và tái dùng cover từ
+  mục Hot cho Truyện đang ra; không phát sinh request ảnh/trang bổ sung.
+- Chuyển mục lục sang endpoint chính thức
+  `/search-chapters?search=&page=N` (khoảng 140 KB/page thay cho trang truyện
+  gần 469 KB), vẫn fallback trang đầy đủ nếu endpoint lỗi. Siết parser theo
+  `chapter-link-mobile` + prefix truyện để không nhận link hành động.
+- Thêm `getChapterAsync` và giới hạn `max_concurrent = 1` để rolling prefetch
+  không dùng request đồng bộ chặn UI. Parser chương cắt thẳng vùng
+  `#chapter-content` trước `chapter-nav`, chỉ sanitize phần nội dung cần thiết.
+- Regression Akay đạt 39 assertion, 35 file Lua compile. Live test đạt Hot
+  36/36 cover, Đang ra 32/32, Hoàn thành 4/4, Chủ đề 18/18; tìm kiếm đúng,
+  *Chung Cực Truyền Kỳ* đủ 324 chương/7 trang và chương mới có 25.425 ký tự.
+
 ## 3.4.3 (BUILD-1325) - 2026-07-29
 
 ### Codex

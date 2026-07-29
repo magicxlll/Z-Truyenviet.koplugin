@@ -6,6 +6,7 @@ package.path = table.concat({
 }, ";")
 
 local requested_urls = {}
+local async_requested_urls = {}
 local response_by_url = {}
 local headers_by_url = {}
 local last_headers = {}
@@ -35,6 +36,18 @@ function Http:request(method, url, body, headers, options)
     }, 302
 end
 
+function Http:requestAsync(method, url, body, headers)
+    if method ~= "GET" then
+        return nil, "unsupported async fixture"
+    end
+    async_requested_urls[#async_requested_urls + 1] = url
+    last_headers = headers or {}
+    return response_by_url[url],
+        response_by_url[url] and nil or "missing async fixture",
+        headers_by_url[url],
+        response_by_url[url] and 200 or nil
+end
+
 package.preload["truyenviet/http_client"] = function()
     return Http
 end
@@ -60,6 +73,17 @@ package.preload["util"] = function()
         end,
         urlEncode = function(value)
             return value:gsub(" ", "%%20")
+        end,
+    }
+end
+
+package.preload["json"] = function()
+    return {
+        decode = function(raw)
+            if type(raw) ~= "string" or raw:sub(1, 5) ~= "JSON:" then
+                error("invalid JSON fixture")
+            end
+            return { html = raw:sub(6) }
         end,
     }
 end
@@ -93,8 +117,12 @@ local story = {
 
 local home_page = [[
     <div class="section-stories-hot mb-3">
-      <a href="https://akaytruyen.com/truyen/truyen-hot-demo">
-        <h3 class="story-name">Nhiệt Demo</h3>
+      <a href="https://akaytruyen.com/truyen/truyen-dang-ra-demo">
+        <img src="/covers/updating.jpg" alt="Đang Ra Demo">
+      </a>
+      <a class="story-name"
+         href="https://akaytruyen.com/truyen/truyen-dang-ra-demo">
+        Đang Ra Demo
       </a>
     </div>
     <div class="section-stories-new mb-3">
@@ -125,14 +153,24 @@ assertEqual(
     updating_listing.stories[1].title,
     "isolates the updating section"
 )
+assertEqual(
+    "https://akaytruyen.com/covers/updating.jpg",
+    updating_listing.stories[1].cover_url,
+    "reuses the matching homepage cover without another request"
+)
 assertEqual(1, updating_listing.total_pages, "updating section has one page")
 
 local hot_listing = assert(AkayTruyen:getHot(1))
 assertEqual(1, #hot_listing.stories, "loads hot stories from homepage")
 assertEqual(
-    "Nhiệt Demo",
+    "Đang Ra Demo",
     hot_listing.stories[1].title,
     "isolates the hot section"
+)
+assertEqual(
+    "https://akaytruyen.com/covers/updating.jpg",
+    hot_listing.stories[1].cover_url,
+    "keeps the hot story cover"
 )
 
 local completed_listing = assert(AkayTruyen:getCompleted(1))
@@ -141,6 +179,16 @@ assertEqual(
     "Hoàn Demo",
     completed_listing.stories[1].title,
     "isolates the completed section"
+)
+assertEqual(
+    "https://akaytruyen.com/covers/full.jpg",
+    completed_listing.stories[1].cover_url,
+    "pairs separate image and title anchors for completed stories"
+)
+assertEqual(
+    1,
+    #requested_urls,
+    "downloads and parses the 900KB homepage only once for all three tabs"
 )
 
 clearRequests()
@@ -186,6 +234,17 @@ assertEqual(
 
 response_by_url[story.url] = page_1
 response_by_url[story.url .. "?page=2"] = page_2
+local endpoint = story.url .. "/search-chapters?search=&page="
+response_by_url[endpoint .. "1"] = "JSON:" .. page_1
+response_by_url[endpoint .. "2"] = "JSON:" .. page_2
+
+clearRequests()
+local endpoint_page = assert(AkayTruyen:getStoryPage(story, 1))
+assertEqual(endpoint .. "1", requested_urls[1], "uses the lightweight chapter endpoint")
+assertEqual(2, #endpoint_page.chapters, "parses endpoint chapter fragment")
+assertEqual(2, endpoint_page.total_pages, "keeps endpoint pagination")
+
+clearRequests()
 local all_chapters = assert(AkayTruyen:getAllChapters(story))
 
 assertEqual(3, #all_chapters, "loads chapters from every page")
@@ -202,6 +261,7 @@ assertEqual(
 )
 
 response_by_url[story.url .. "?page=2"] = nil
+response_by_url[endpoint .. "2"] = nil
 local partial_result, partial_err = AkayTruyen:getAllChapters(story)
 assertEqual(nil, partial_result, "rejects a partial all-chapters result")
 assertEqual(
@@ -211,6 +271,7 @@ assertEqual(
 )
 
 response_by_url[story.url .. "?page=2"] = page_1
+response_by_url[endpoint .. "2"] = "JSON:" .. page_1
 local duplicate_result, duplicate_err = AkayTruyen:getAllChapters(story)
 assertEqual(nil, duplicate_result, "rejects repeated pagination data")
 assertEqual(
@@ -245,6 +306,46 @@ assertEqual(
     true,
     public_result.content:find("Nội dung công khai", 1, true) ~= nil,
     "does not mistake shared VIP CSS for an actual lock screen"
+)
+
+local optimized_chapter_url = "https://akaytruyen.com/demo/chuong-toi-uu"
+local optimized_chapter_html = [[
+    <h1 class="text-center custom-text"><b>Chương tối ưu</b></h1>
+    <div id="chapter-content">
+      <p>Đoạn đầu hợp lệ.</p>
+      <div><p>Đoạn lồng nhau vẫn được giữ.</p></div>
+    </div>
+    <div class="chapter-nav d-flex"><p>KHÔNG ĐƯỢC LẤY THANH ĐIỀU HƯỚNG</p></div>
+]]
+response_by_url[optimized_chapter_url] = optimized_chapter_html
+local optimized_chapter = {
+    title = "Chương tối ưu",
+    url = optimized_chapter_url,
+}
+local optimized_result = assert(AkayTruyen:parseChapter(
+    optimized_chapter_html,
+    optimized_chapter
+))
+assertEqual(
+    true,
+    optimized_result.content:find("Đoạn lồng nhau", 1, true) ~= nil,
+    "keeps nested chapter content in the fast plain-string slice"
+)
+assertEqual(
+    nil,
+    optimized_result.content:find("KHÔNG ĐƯỢC LẤY", 1, true),
+    "stops the fast chapter slice before navigation"
+)
+local async_result = assert(AkayTruyen:getChapterAsync(optimized_chapter))
+assertEqual(
+    optimized_chapter_url,
+    async_requested_urls[#async_requested_urls],
+    "rolling prefetch uses Http requestAsync instead of a blocking GET"
+)
+assertEqual(
+    true,
+    async_result.content:find("Đoạn đầu hợp lệ", 1, true) ~= nil,
+    "async chapter fetch uses the same validated parser"
 )
 
 local vip_result, vip_err = AkayTruyen:parseChapter(vip_html, {
@@ -288,6 +389,17 @@ assertEqual(
         and last_post.headers.Cookie:find("XSRF-TOKEN=token123", 1, true)
             ~= nil,
     "carries the CSRF session cookie into login"
+)
+
+assertEqual(
+    "function",
+    type(AkayTruyen.getChapterAsync),
+    "provides cooperative async chapter fetch for rolling prefetch"
+)
+assertEqual(
+    1,
+    AkayTruyen.max_concurrent,
+    "limits Akay background chapter downloads to one request"
 )
 
 print(string.format("AkayTruyen tests passed: %d assertions", assertions))
