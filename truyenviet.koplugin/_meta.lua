@@ -1,4 +1,5 @@
 return {
+    name = "truyenviet",
     fullname = "Truyện Việt",
-    description = "Tìm, tải và đọc truyện trực tuyến từ TruyenFull, TruyenQQ, Dưa Leo và Truyendich.",
+    description = "Plugin tìm, tải và đọc truyện chữ & truyện tranh đa nguồn cho KOReader.",
 }
