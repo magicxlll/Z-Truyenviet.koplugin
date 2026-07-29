@@ -80,7 +80,16 @@ function DocumentBuilder:buildText(source, story, chapter, payload, is_temp)
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>%s</title>
   <style>
-    body { line-height: 1.65; margin: 5%%; text-align: justify; }
+    @font-face {
+      font-family: 'ComicHelvetic-Light';
+      src: url('ComicHelvetic-Light.ttf');
+    }
+    body, p, div, article, h1, h2, h3, h4, h5, h6 {
+      font-family: 'ComicHelvetic-Light', 'ComicHelvetic', sans-serif !important;
+      line-height: 1.65;
+      margin: 5%%;
+      text-align: justify;
+    }
     h1 { font-size: 1.35em; line-height: 1.3; text-align: center; }
     .source { color: #666; font-size: 0.8em; text-align: center; }
     img { height: auto; max-width: 100%%; }

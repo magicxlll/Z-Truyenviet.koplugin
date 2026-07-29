@@ -12,8 +12,7 @@ function FontHelper:setupComicFont()
     pcall(function()
         local data_dir = DataStorage:getDataDir()
         local plugin_font = ffiutil.joinPath(data_dir, "plugins/truyenviet.koplugin/fonts/ComicHelvetic-Light.ttf")
-        
-        -- Các đường dẫn fonts của KOReader
+
         local target_dirs = {
             ffiutil.joinPath(data_dir, "fonts"),
             "./fonts",
@@ -53,24 +52,48 @@ function FontHelper:setupComicFont()
                     path = primary_target,
                 }
             }
+            FontList.fontnames["ComicHelvetic-Light"] = FontList.fontinfo["ComicHelvetic-Light.ttf"]
+            FontList.fontnames["ComicHelvetic-Light.ttf"] = FontList.fontinfo["ComicHelvetic-Light.ttf"]
             if not util.tableContains(FontList.fontlist, "ComicHelvetic-Light.ttf") then
                 table.insert(FontList.fontlist, "ComicHelvetic-Light.ttf")
             end
         end
 
-        if Font and Font.fontmap then
-            Font.fontmap.cfont = "ComicHelvetic-Light.ttf"
-            Font.fontmap.infofont = "ComicHelvetic-Light.ttf"
-            Font.fontmap.smallinfofont = "ComicHelvetic-Light.ttf"
-            Font.fontmap.xx_smallinfofont = "ComicHelvetic-Light.ttf"
-            Font.fontmap.tfont = "ComicHelvetic-Light.ttf"
-            Font.fontmap.smalltfont = "ComicHelvetic-Light.ttf"
-            Font.fontmap.x_smalltfont = "ComicHelvetic-Light.ttf"
-            Font.fontmap.ffont = "ComicHelvetic-Light.ttf"
-            Font.fontmap.smallffont = "ComicHelvetic-Light.ttf"
-            Font.fontmap.largeffont = "ComicHelvetic-Light.ttf"
-            Font.fontmap.rifont = "ComicHelvetic-Light.ttf"
-            Font.fontmap.pgfont = "ComicHelvetic-Light.ttf"
+        if Font then
+            -- Clear font caches to force KOReader to reload with Comic font
+            if type(Font.fontcache) == "table" then
+                for k in pairs(Font.fontcache) do Font.fontcache[k] = nil end
+            end
+            if type(Font.facemap) == "table" then
+                for k in pairs(Font.facemap) do Font.facemap[k] = nil end
+            end
+
+            if Font.fontmap then
+                Font.fontmap.cfont = "ComicHelvetic-Light.ttf"
+                Font.fontmap.infofont = "ComicHelvetic-Light.ttf"
+                Font.fontmap.smallinfofont = "ComicHelvetic-Light.ttf"
+                Font.fontmap.xx_smallinfofont = "ComicHelvetic-Light.ttf"
+                Font.fontmap.tfont = "ComicHelvetic-Light.ttf"
+                Font.fontmap.smalltfont = "ComicHelvetic-Light.ttf"
+                Font.fontmap.x_smalltfont = "ComicHelvetic-Light.ttf"
+                Font.fontmap.ffont = "ComicHelvetic-Light.ttf"
+                Font.fontmap.smallffont = "ComicHelvetic-Light.ttf"
+                Font.fontmap.largeffont = "ComicHelvetic-Light.ttf"
+                Font.fontmap.rifont = "ComicHelvetic-Light.ttf"
+                Font.fontmap.pgfont = "ComicHelvetic-Light.ttf"
+            end
+
+            -- Intercept Font:getFace so all UI widgets get Comic font
+            if not Font._truyenviet_original_getFace then
+                Font._truyenviet_original_getFace = Font.getFace
+                Font.getFace = function(font_self, font_name, size, ...)
+                    local ok, face = pcall(Font._truyenviet_original_getFace, font_self, "ComicHelvetic-Light.ttf", size, ...)
+                    if ok and face then
+                        return face
+                    end
+                    return Font._truyenviet_original_getFace(font_self, font_name, size, ...)
+                end
+            end
         end
     end)
     self._initialized = true

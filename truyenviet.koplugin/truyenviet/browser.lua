@@ -1012,8 +1012,12 @@ function Browser:browseSource(source, genre, local_page, on_return_callback)
                         end
                     elseif genre and genre.section == "completed" then
                         r, e = source:getCompleted(server_page)
-                    elseif genre and genre.url then
-                        r, e = source:getGenre(genre, server_page)
+                    elseif genre and (genre.url or type(genre) == "string") then
+                        local g_obj = type(genre) == "string" and { name = genre, url = genre } or genre
+                        if g_obj.url and not g_obj.url:find("^https?://") then
+                            g_obj.url = Util.absoluteUrl(source.base_url, g_obj.url)
+                        end
+                        r, e = source:getGenre(g_obj, server_page)
                     else
                         r, e = source:getCompleted(server_page)
                     end
