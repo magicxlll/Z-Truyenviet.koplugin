@@ -739,16 +739,53 @@ function Browser:showRoot()
             end,
         })
     table.insert(items, {
+        text = "🎨 Cấu hình Font ComicHelvetic Toàn Hệ Thống",
+        callback = function()
+            local FontHelper = require("truyenviet/font_helper")
+            local installed = FontHelper:isUserPatchInstalled()
+            local ConfirmBox = require("ui/widget/confirmbox")
+
+            UIManager:show(ConfirmBox:new{
+                title = "Giao diện Font ComicHelvetic",
+                text = installed 
+                    and "Trạng thái: ✅ ĐÃ BẬT User Patch Font ComicHelvetic toàn giao diện KOReader.\n\nBạn có muốn TẮT và gỡ bỏ User Patch này không?"
+                    or "Trạng thái: ❌ CHƯA BẬT User Patch.\n\nKích hoạt User Patch sẽ cài đặt font ComicHelvetic-Light.ttf làm font mặc định cho TOÀN BỘ KOReader (Menu, Popup, Ô văn bản, Tiêu đề).\n\nBạn có muốn BẬT ngay không?",
+                ok_text = installed and "Tắt User Patch" or "Bật User Patch",
+                cancel_text = "Hủy",
+                ok_callback = function()
+                    if installed then
+                        FontHelper:removeUserPatch()
+                        UIManager:show(InfoMessage:new{
+                            title = "Truyện Việt",
+                            text = "Đã gỡ bỏ User Patch font. Vui lòng khởi động lại KOReader.",
+                        })
+                    else
+                        if FontHelper:installUserPatch() then
+                            UIManager:show(InfoMessage:new{
+                                title = "Truyện Việt",
+                                text = "Đã cài đặt User Patch font thành công!\nVui lòng khởi động lại KOReader để áp dụng font ComicHelvetic toàn giao diện.",
+                            })
+                        else
+                            showError("Không thể ghi file User Patch vào hệ thống.")
+                        end
+                    end
+                end,
+            })
+        end,
+    })
+    table.insert(items, {
             text = "Giới thiệu & Font chữ",
             callback = function()
+                local FontHelper = require("truyenviet/font_helper")
+                local installed = FontHelper:isUserPatchInstalled()
                 UIManager:show(TextViewer:new{
                     title = "Truyện Việt",
                     text = table.concat({
                         "🔥 Truyện Việt cho KOReader v" .. Version,
                         "Đọc truyện trực tuyến mượt mà trên máy đọc sách Kobo/Kindle/Android.",
                         "",
-                        "🔤 Font chữ mặc định: ComicHelvetic-Light (ComicHelvetic-Light.ttf)",
-                        "Font chữ được tích hợp sẵn trong plugin, tự động cài đặt vào KOReader giúp hiển thị tiếng Việt mượt mà sắc nét trên màn hình E-ink.",
+                        "🔤 Font chữ ComicHelvetic-Light (ComicHelvetic-Light.ttf):",
+                        installed and "-> Trạng thái: ✅ ĐÃ BẬT User Patch Font toàn KOReader." or "-> Trạng thái: ❌ CHƯA BẬT (Dùng tùy chọn bên trên để Bật User Patch toàn KOReader).",
                         "",
                         "Nguồn truyện chữ: TruyenFull, Truyện Dịch AI, AkayTruyen, Con Đường Bá Chủ, v.v.",
                         "Nguồn truyện tranh: TruyenQQ, Dưa Leo, Cbunu, Hắc Ám Chi Các, TVE-4U, v.v.",
