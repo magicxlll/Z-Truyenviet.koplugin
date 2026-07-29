@@ -11,28 +11,38 @@ function FontHelper:setupComicFont()
         local data_dir = DataStorage:getDataDir()
         local plugin_font = ffiutil.joinPath(data_dir, "plugins/truyenviet.koplugin/fonts/ComicHelvetic-Light.ttf")
 
-        local primary_target = ffiutil.joinPath(data_dir, "fonts/ComicHelvetic-Light.ttf")
+        local font_data = nil
+        local f_in = io.open(plugin_font, "rb")
+        if f_in then
+            font_data = f_in:read("*all")
+            f_in:close()
+        end
 
-        -- 1. Sao chép font vào thư mục fonts nếu chưa có
-        local f_check = io.open(primary_target, "rb")
-        if f_check then
-            f_check:close()
-        else
-            local f_in = io.open(plugin_font, "rb")
-            if f_in then
-                local data = f_in:read("*all")
-                f_in:close()
-                util.makePath(ffiutil.joinPath(data_dir, "fonts"))
-                local f_out = io.open(primary_target, "wb")
+        if not font_data then return end
+
+        local target_dirs = {
+            ffiutil.joinPath(data_dir, "fonts"),
+            "./fonts",
+            "/opt/lib/koreader/fonts",
+            "/mnt/onboard/fonts",
+            "/sdcard/fonts",
+        }
+
+        for _, dir in ipairs(target_dirs) do
+            pcall(function()
+                util.makePath(dir)
+                local dest_path = ffiutil.joinPath(dir, "ComicHelvetic-Light.ttf")
+                local f_out = io.open(dest_path, "wb")
                 if f_out then
-                    f_out:write(data)
+                    f_out:write(font_data)
                     f_out:close()
                 end
-            end
+            end)
         end
 
         -- 2. Đăng ký với FontList của KOReader
         if FontList and FontList.fontinfo then
+            local primary_target = ffiutil.joinPath(data_dir, "fonts/ComicHelvetic-Light.ttf")
             local entry = {
                 {
                     family = "Comic Helvetic",
