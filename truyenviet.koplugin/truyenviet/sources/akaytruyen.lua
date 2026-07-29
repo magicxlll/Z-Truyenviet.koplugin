@@ -13,8 +13,13 @@ function Source:getCoverHeaders()
     return {
         ["Referer"] = self.base_url .. "/",
         ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        ["X-Requested-With"] = "XMLHttpRequest",
     }
+end
+
+-- Akay trả 500 cho trang truyện/chương khi gửi X-Requested-With. Giữ một
+-- bộ header HTML rõ ràng để mọi request đọc nội dung luôn giống trình duyệt.
+function Source:getPageHeaders()
+    return self:getCoverHeaders()
 end
 
 function Source:parseSearch(html)
@@ -97,34 +102,78 @@ function Source:parseListing(html, page)
     }
 end
 
+local function extractHomeSection(html, start_marker, end_marker)
+    local start_at = html:find(start_marker, 1, true)
+    if not start_at then
+        return ""
+    end
+    local end_at = end_marker
+        and html:find(end_marker, start_at + #start_marker, true)
+    return html:sub(start_at, (end_at and end_at - 1) or #html)
+end
+
+function Source:parseHomeSection(html, page, start_marker, end_marker, title)
+    local section_html = extractHomeSection(html, start_marker, end_marker)
+    if section_html == "" then
+        return nil, "Không tìm thấy mục danh sách '" .. title .. "' trên AkayTruyen"
+    end
+
+    return {
+        stories = self:parseSearch(section_html),
+        genres = Util.parseGenres(html, self.base_url),
+        page = page or 1,
+        total_pages = 1,
+        title = title,
+    }
+end
+
+function Source:getHomePage()
+    return Http:get(self.base_url .. "/", self:getCoverHeaders())
+end
+
 function Source:getCompleted(page)
     page = page or 1
-    local url = self.base_url .. "/danh-sach/truyen-full"
-    if page > 1 then
-        url = url .. "?page=" .. page
-    end
-    local html, err = Http:get(url, self:getCoverHeaders())
+    local html, err = self:getHomePage()
     if not html then
         return nil, err
     end
-    local result = self:parseListing(html, page)
-    result.title = "Truyện hoàn thành"
-    return result
+    return self:parseHomeSection(
+        html,
+        page,
+        '<div class="section-stories-full',
+        '<div id="id_feedback_button"',
+        "Truyện hoàn thành"
+    )
 end
 
 function Source:getHot(page)
     page = page or 1
-    local url = self.base_url .. "/danh-sach/truyen-hot"
-    if page > 1 then
-        url = url .. "?page=" .. page
-    end
-    local html, err = Http:get(url, self:getCoverHeaders())
+    local html, err = self:getHomePage()
     if not html then
         return nil, err
     end
-    local result = self:parseListing(html, page)
-    result.title = "Truyện hot"
-    return result
+    return self:parseHomeSection(
+        html,
+        page,
+        '<div class="section-stories-hot',
+        '<div class="section-stories-new',
+        "Truyện hot"
+    )
+end
+
+function Source:getUpdating(page)
+    page = page or 1
+    local html, err = self:getHomePage()
+    if not html then
+        return nil, err
+    end
+    return self:parseHomeSection(
+        html,
+        page,
+        '<div class="section-stories-new',
+        '<div class="section-stories-full',
+        "Truyện mới cập nhật"
+    )
 end
 
 function Source:getGenre(genre, page)
@@ -165,7 +214,7 @@ function Source:parseStoryDetails(html)
 end
 
 function Source:getStoryDetails(story)
-    local html, err = Http:get(story.url, self:getCoverHeaders())
+    local html, err = Http:get(story.url, self:getPageHeaders())
     if not html then
         return nil, err
     end
@@ -275,7 +324,7 @@ function Source:getStoryPage(story, page)
     local story_url = story.url:gsub("%?.*$", "")
     local page_url = page == 1 and story_url or (story_url .. "?page=" .. page)
 
-    local html, err = Http:get(page_url, self:getCoverHeaders())
+    local html, err = Http:get(page_url, self:getPageHeaders())
     if not html then
         return nil, err
     end
@@ -285,7 +334,7 @@ end
 
 function Source:getAllChapters(story, progress_cb)
     local story_url = story.url:gsub("%?.*$", "")
-    local first_html, err = Http:get(story_url, self:getCoverHeaders())
+    local first_html, err = Http:get(story_url, self:getPageHeaders())
     if not first_html then return nil, err end
 
     local total_pages = tonumber(first_html:match('class="jump%-input[^"]*"[^>]-max="(%d+)"')) or 1
@@ -307,7 +356,7 @@ function Source:getAllChapters(story, progress_cb)
         if p == 1 then
             html = first_html
         else
-            html, page_err = Http:get(p_url, self:getCoverHeaders())
+            html, page_err = Http:get(p_url, self:getPageHeaders())
         end
         if not html then
             return nil, string.format(
@@ -408,7 +457,7 @@ function Source:parseChapter(html, chapter)
 end
 
 function Source:getChapter(chapter)
-    local html, err = Http:get(chapter.url, self:getCoverHeaders())
+    local html, err = Http:get(chapter.url, self:getPageHeaders())
     if not html then
         return nil, err
     end

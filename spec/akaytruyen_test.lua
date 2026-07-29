@@ -7,13 +7,12 @@ package.path = table.concat({
 
 local requested_urls = {}
 local response_by_url = {}
+local last_headers = {}
 local Http = {}
 
 function Http:get(url, headers)
     requested_urls[#requested_urls + 1] = url
-    if not headers or headers["X-Requested-With"] ~= "XMLHttpRequest" then
-        return nil, "missing X-Requested-With"
-    end
+    last_headers = headers or {}
     return response_by_url[url], response_by_url[url] and nil or "missing fixture"
 end
 
@@ -62,10 +61,70 @@ local function assertEqual(expected, actual, message)
     end
 end
 
+local function clearRequests()
+    for index = #requested_urls, 1, -1 do
+        table.remove(requested_urls, index)
+    end
+end
+
 local story = {
     title = "Chung Cực Truyền Kỳ",
     url = "https://akaytruyen.com/truyen/chung-cuc-truyen-ky",
 }
+
+local home_page = [[
+    <div class="section-stories-hot mb-3">
+      <a href="https://akaytruyen.com/truyen/truyen-hot-demo">
+        <h3 class="story-name">Nhiệt Demo</h3>
+      </a>
+    </div>
+    <div class="section-stories-new mb-3">
+      <h3 class="title-text-story">
+        <a href="https://akaytruyen.com/truyen/truyen-dang-ra-demo"
+           title="Đang Ra Demo">Đang Ra Demo</a>
+      </h3>
+    </div>
+    <div class="section-stories-full mb-3">
+      <a href="https://akaytruyen.com/truyen/truyen-full-demo">
+        <img src="/covers/full.jpg" alt="Truyện Full Demo">
+      </a>
+      <a class="story-name"
+         href="https://akaytruyen.com/truyen/truyen-full-demo">
+        Hoàn Demo
+      </a>
+    </div>
+    <div id="id_feedback_button"></div>
+]]
+
+response_by_url[AkayTruyen.base_url] = home_page
+response_by_url[AkayTruyen.base_url .. "/"] = home_page
+
+local updating_listing = assert(AkayTruyen:getUpdating(1))
+assertEqual(1, #updating_listing.stories, "loads updating stories from homepage")
+assertEqual(
+    "Đang Ra Demo",
+    updating_listing.stories[1].title,
+    "isolates the updating section"
+)
+assertEqual(1, updating_listing.total_pages, "updating section has one page")
+
+local hot_listing = assert(AkayTruyen:getHot(1))
+assertEqual(1, #hot_listing.stories, "loads hot stories from homepage")
+assertEqual(
+    "Nhiệt Demo",
+    hot_listing.stories[1].title,
+    "isolates the hot section"
+)
+
+local completed_listing = assert(AkayTruyen:getCompleted(1))
+assertEqual(1, #completed_listing.stories, "loads completed stories from homepage")
+assertEqual(
+    "Hoàn Demo",
+    completed_listing.stories[1].title,
+    "isolates the completed section"
+)
+
+clearRequests()
 
 local page_1 = [[
     <a class="chapter-link-mobile"
@@ -112,6 +171,11 @@ local all_chapters = assert(AkayTruyen:getAllChapters(story))
 
 assertEqual(3, #all_chapters, "loads chapters from every page")
 assertEqual(2, #requested_urls, "requests every chapter page")
+assertEqual(
+    nil,
+    last_headers["X-Requested-With"],
+    "does not send AJAX header to chapter pages"
+)
 assertEqual(
     "https://akaytruyen.com/chung-cuc-truyen-ky/khai-menh-nghich-thien",
     all_chapters[3].url,

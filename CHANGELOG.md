@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.3.6 (BUILD-1318) - 2026-07-29
+
+### Codex
+
+- Tái hiện đúng lỗi B-1317 ở luồng **Truyện đang ra**: các route
+  `/danh-sach/truyen-*` của AkayTruyen đã trả `404`, trong khi Browser chỉ
+  hiển thị thông báo lỗi tổng quát.
+- Thay `getUpdating`, `getHot` và `getCompleted` bằng parser ba mục tương ứng
+  trên trang chủ Akay (`section-stories-new`, `section-stories-hot`,
+  `section-stories-full`), tránh phụ thuộc route đã bị xóa; kết quả live hiện
+  lần lượt có 31, 35 và 4 truyện.
+- Bỏ `X-Requested-With: XMLHttpRequest` khỏi request HTML. Akay trả `500` cho
+  URL chương khi có header này, còn request trình duyệt thông thường trả `200`.
+  Đồng bộ source Lua, JSON bundled, generator output và SPEC.
+- Thêm regression assertion bảo đảm request trang chương không gửi header AJAX.
+- E2E trong runtime KOReader: Akay “Truyện đang ra”/“Hot”/“Hoàn thành” đọc
+  được, *Chung Cực Truyền Kỳ* có 7 trang chương và chương live tải được
+  (23.896 ký tự); Storya vẫn đọc được 20 truyện/163 trang để đối chiếu.
+
 ## 3.3.5 (BUILD-1317) - 2026-07-29
 
 ### Codex
