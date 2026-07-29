@@ -584,7 +584,7 @@ function Browser:showRoot()
                 local Http = require("truyenviet/http_client")
                 runOnline(function()
                     local res, err = withLoading("Đang kiểm tra cập nhật...", function()
-                        local response, req_err = Http:get("https://api.github.com/repos/hashi173/truyenviet.koplugin/releases/latest")
+                        local response, req_err = Http:get("https://api.github.com/repos/magicxlll/Z-Truyenviet.koplugin/releases/latest")
                         if not response then error(req_err or "Lỗi kết nối") end
                         return response
                     end)

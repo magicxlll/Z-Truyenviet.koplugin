@@ -143,7 +143,7 @@ function CredentialManager:removeCredential(source_id)
     return true
 end
 
-local DEFAULT_FIRECRAWL_KEY = "fc-8d74d9b08d5a4677b6c715834d4e8cec"
+local DEFAULT_FIRECRAWL_KEY = ""
 
 function CredentialManager:saveFirecrawlKey(key)
     Storage:initialize()

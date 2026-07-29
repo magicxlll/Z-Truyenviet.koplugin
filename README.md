@@ -1,6 +1,6 @@
 # Truyện Việt cho KOReader
 
-Plugin KOReader thuần Lua để tìm và đọc (phiên bản 3.3.8 BUILD-1320):
+Plugin KOReader thuần Lua để tìm và đọc (phiên bản 3.4.0 BUILD-1322):
 
 - Truyện chữ từ [truyenfull.live](https://truyenfull.live)
 - Truyện tranh từ [truyenqqko.com](https://truyenqqko.com)
@@ -18,15 +18,16 @@ Plugin KOReader thuần Lua để tìm và đọc (phiên bản 3.3.8 BUILD-1320
 - Truyện chữ từ [dualeotruyenfull.net](https://dualeotruyenfull.net)
 - Truyện chữ từ [truyenc.com](https://truyenc.com)
 - Truyện chữ từ [akaytruyen.com](https://akaytruyen.com)
-- Truyện chữ từ [conduongbachu.com](https://conduongbachu.com)
+- Truyện chữ từ [conduongbachu.com](https://conduongbachu.com) (bao gồm Chính truyện & 3 Bộ Ngoại truyện)
 
 Plugin tải chương về thư mục dữ liệu KOReader rồi mở bằng trình đọc có sẵn:
 
-- Truyện chữ được lưu dưới dạng HTML.
+- Truyện chữ được lưu dưới dạng HTML / EPUB.
 - Truyện tranh được đóng gói thành CBZ, phù hợp với trình đọc manga của KOReader.
 
 ## Tính năng
 
+- **Tự động Cập nhật Trực tiếp (Self-Updater)** từ GitHub Repository (`magicxlll/Z-Truyenviet.koplugin`). Tự động giữ nguyên 100% Lịch sử đọc, Tủ truyện, Cài đặt và File đã tải của người dùng.
 - Chạm vào từng nguồn để mở ngay danh sách truyện đã hoàn thành.
 - Tìm riêng trong nguồn bằng nút kính lúp, lọc theo thể loại và chuyển trang ngay trên danh sách.
 - Tìm đồng thời trên mọi nguồn đang bật hoặc tìm theo từng nguồn.
@@ -35,7 +36,7 @@ Plugin tải chương về thư mục dữ liệu KOReader rồi mở bằng tr�
 - Bật/tắt nguồn trong plugin.
 - Giữ tên truyện để xem mô tả, tải lại ảnh bìa, hoặc thêm/xóa khỏi tủ truyện.
 - Xem danh sách chương và phân trang dễ dàng.
-- **Tải thành 1 bộ**: Gom tất cả các chương truyện chữ thành 1 file HTML duy nhất để đọc mượt mà.
+- **Tải thành 1 bộ**: Gom tất cả các chương truyện chữ thành 1 file EPUB/HTML duy nhất để đọc mượt mà.
 - Lưu truyện vào tủ truyện, lưu Lịch sử đọc.
 - **Xóa hết**: Xóa sạch toàn bộ tủ truyện hoặc lịch sử đọc, kèm tùy chọn tự động dọn dẹp file đã tải để giải phóng bộ nhớ.
 - Nút `Quay lại Truyện Việt` trong menu khi đang đọc chương.
