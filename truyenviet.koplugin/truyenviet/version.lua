@@ -1,1 +1,2 @@
-return "3.6.4 (BUILD-1339)"
+-- Internal Dev Tracking: BUILD_NUMBER = "1340"
+return "3.7.0"
