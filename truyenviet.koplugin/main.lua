@@ -42,7 +42,7 @@ function TruyenViet:init()
     Dispatcher:registerAction("start_truyenviet", {
         category = "none",
         event = "StartTruyenViet",
-        title = "Truyện Việt v" .. Version,
+        title = "🔥 Truyện Việt v" .. Version,
         general = true,
     })
 
@@ -52,29 +52,32 @@ function TruyenViet:init()
         title = "📋 Truyện Việt: Danh sách chương",
         general = true,
     })
+
+    Dispatcher:registerAction("truyenviet_continue", {
+        category = "none",
+        event = "TruyenVietContinue",
+        title = "📖 Truyện Việt: Tiếp tục đọc",
+        general = true,
+    })
+
+    Dispatcher:registerAction("truyenviet_history", {
+        category = "none",
+        event = "TruyenVietHistory",
+        title = "📜 Truyện Việt: Lịch sử đọc",
+        general = true,
+    })
+
+    Dispatcher:registerAction("truyenviet_downloaded", {
+        category = "none",
+        event = "TruyenVietDownloaded",
+        title = "💾 Truyện Việt: Đã tải xuống",
+        general = true,
+    })
 end
 
 function TruyenViet:addToMainMenu(menu_items)
     local function openTruyenViet()
         Browser:showRoot()
-    end
-    local function openContinue()
-        local Storage = require("truyenviet/storage")
-        local SourceRegistry = require("truyenviet/source_registry")
-        local history = Storage:getHistory()
-        if #history > 0 then
-            local latest = history[1]
-            local src = SourceRegistry:get(latest.story.source_id)
-            if src then
-                Browser:loadStoryPage(latest.story, src, 1, function()
-                    Browser:showRoot()
-                end)
-            else
-                Browser:showHistory(function() Browser:showRoot() end)
-            end
-        else
-            Browser:showRoot()
-        end
     end
 
     local title_text = "🔥 Truyện Việt v" .. Version
@@ -91,6 +94,30 @@ function TruyenViet:addToMainMenu(menu_items)
         sorting_hint = "tools",
         callback = function()
             self:onTruyenVietBackToChapters()
+        end,
+    }
+
+    menu_items.truyenviet_continue = {
+        text = "📖 Truyện Việt: Tiếp tục đọc",
+        sorting_hint = "tools",
+        callback = function()
+            self:onTruyenVietContinue()
+        end,
+    }
+
+    menu_items.truyenviet_history = {
+        text = "📜 Truyện Việt: Lịch sử đọc",
+        sorting_hint = "tools",
+        callback = function()
+            self:onTruyenVietHistory()
+        end,
+    }
+
+    menu_items.truyenviet_downloaded = {
+        text = "💾 Truyện Việt: Đã tải xuống",
+        sorting_hint = "tools",
+        callback = function()
+            self:onTruyenVietDownloaded()
         end,
     }
 
@@ -115,16 +142,6 @@ function TruyenViet:addToMainMenu(menu_items)
             text = title_text,
             sorting_hint = "main",
             callback = openTruyenViet,
-        }
-        menu_items.truyenviet_continue_search = {
-            text = "📖 Truyện Việt: Tiếp tục đọc",
-            sorting_hint = "search",
-            callback = openContinue,
-        }
-        menu_items.truyenviet_continue_tools = {
-            text = "📖 Truyện Việt: Tiếp tục đọc",
-            sorting_hint = "tools",
-            callback = openContinue,
         }
     end
 end
@@ -158,7 +175,35 @@ function TruyenViet:onTruyenVietBackToChapters()
     end
 end
 
+function TruyenViet:onTruyenVietContinue()
+    local Storage = require("truyenviet/storage")
+    local SourceRegistry = require("truyenviet/source_registry")
+    local history = Storage:getHistory()
+    if #history > 0 then
+        local latest = history[1]
+        local src = SourceRegistry:get(latest.story.source_id)
+        if src then
+            Browser:loadStoryPage(latest.story, src, 1, function()
+                Browser:showRoot()
+            end)
+        else
+            Browser:showHistory(function() Browser:showRoot() end)
+        end
+    else
+        Browser:showRoot()
+    end
+end
+
+function TruyenViet:onTruyenVietHistory()
+    Browser:showHistory(function() Browser:showRoot() end)
+end
+
+function TruyenViet:onTruyenVietDownloaded()
+    Browser:showDownloadedManager(function() Browser:showRoot() end)
+end
+
 return TruyenViet
+
 
 
 
