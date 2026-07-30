@@ -45,6 +45,13 @@ function TruyenViet:init()
         title = "Truyện Việt v" .. Version,
         general = true,
     })
+
+    Dispatcher:registerAction("truyenviet_chapter_list", {
+        category = "none",
+        event = "TruyenVietBackToChapters",
+        title = "📋 Truyện Việt: Danh sách chương",
+        general = true,
+    })
 end
 
 function TruyenViet:addToMainMenu(menu_items)
@@ -79,7 +86,13 @@ function TruyenViet:addToMainMenu(menu_items)
         callback = openTruyenViet,
     }
 
-
+    menu_items.truyenviet_back_to_chapters = {
+        text = "📋 Truyện Việt: Danh sách chương",
+        sorting_hint = "tools",
+        callback = function()
+            self:onTruyenVietBackToChapters()
+        end,
+    }
 
     if self.ui and self.ui.name == "ReaderUI" then
         menu_items.truyenviet_reader_tools = {
@@ -120,6 +133,32 @@ function TruyenViet:onStartTruyenViet()
     Browser:showRoot()
 end
 
+function TruyenViet:onTruyenVietBackToChapters()
+    local Reader = require("truyenviet/reader")
+    local ReaderUI = require("apps/reader/readerui")
+    if Reader.active and ReaderUI.instance then
+        Reader:returnToPlugin()
+    else
+        local Storage = require("truyenviet/storage")
+        local SourceRegistry = require("truyenviet/source_registry")
+        local history = Storage:getHistory()
+        if #history > 0 then
+            local latest = history[1]
+            local src = SourceRegistry:get(latest.story.source_id)
+            if src then
+                Browser:loadStoryPage(latest.story, src, 1, function()
+                    Browser:showRoot()
+                end)
+            else
+                Browser:showHistory(function() Browser:showRoot() end)
+            end
+        else
+            Browser:showRoot()
+        end
+    end
+end
+
 return TruyenViet
+
 
 
