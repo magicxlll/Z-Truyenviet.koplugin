@@ -72,6 +72,13 @@ function TruyenViet:addToMainMenu(menu_items)
 
     local title_text = "🔥 Truyện Việt v" .. Version
 
+    -- Registered plugin entry for KOReader Plugin list & Zen UI PluginScan
+    menu_items.truyenviet = {
+        text = title_text,
+        sorting_hint = "plugins",
+        callback = openTruyenViet,
+    }
+
     if self.ui and self.ui.name == "ReaderUI" then
         menu_items.truyenviet_reader_tools = {
             text = title_text,
@@ -107,8 +114,25 @@ function TruyenViet:addToMainMenu(menu_items)
     end
 end
 
+function TruyenViet:show()
+    Browser:showRoot()
+end
+
+function TruyenViet:onShow()
+    Browser:showRoot()
+end
+
+function TruyenViet:open()
+    Browser:showRoot()
+end
+
+function TruyenViet:onTruyenviet()
+    Browser:showRoot()
+end
+
 function TruyenViet:onStartTruyenViet()
     Browser:showRoot()
 end
 
 return TruyenViet
+
