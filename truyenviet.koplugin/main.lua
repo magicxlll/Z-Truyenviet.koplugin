@@ -116,25 +116,10 @@ function TruyenViet:addToMainMenu(menu_items)
     end
 end
 
-function TruyenViet:show()
-    Browser:showRoot()
-end
-
-function TruyenViet:onShow()
-    Browser:showRoot()
-end
-
-function TruyenViet:open()
-    Browser:showRoot()
-end
-
-function TruyenViet:onTruyenviet()
-    Browser:showRoot()
-end
-
 function TruyenViet:onStartTruyenViet()
     Browser:showRoot()
 end
 
 return TruyenViet
+
 
