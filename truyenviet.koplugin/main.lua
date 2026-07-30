@@ -75,9 +75,11 @@ function TruyenViet:addToMainMenu(menu_items)
     -- Registered plugin entry for KOReader Plugin list & Zen UI PluginScan
     menu_items.truyenviet = {
         text = title_text,
-        sorting_hint = "plugins",
+        sorting_hint = "tools",
         callback = openTruyenViet,
     }
+
+
 
     if self.ui and self.ui.name == "ReaderUI" then
         menu_items.truyenviet_reader_tools = {
