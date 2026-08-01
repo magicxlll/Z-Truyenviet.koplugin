@@ -294,4 +294,41 @@ function Util.maxPage(html, minimum)
     return max_page
 end
 
+function Util.naturalCompare(strA, strB)
+    local s1 = tostring(strA or "")
+    local s2 = tostring(strB or "")
+
+    local function chunkString(str)
+        local chunks = {}
+        for text, number in str:gmatch("(%D*)(%d*)") do
+            if text ~= "" then
+                table.insert(chunks, text:lower())
+            end
+            if number ~= "" then
+                table.insert(chunks, tonumber(number))
+            end
+        end
+        return chunks
+    end
+
+    local c1 = chunkString(s1)
+    local c2 = chunkString(s2)
+
+    local minLen = math.min(#c1, #c2)
+    for i = 1, minLen do
+        local v1 = c1[i]
+        local v2 = c2[i]
+        if type(v1) == type(v2) then
+            if v1 ~= v2 then
+                return v1 < v2
+            end
+        else
+            return type(v1) == "number"
+        end
+    end
+
+    return #c1 < #c2
+end
+
 return Util
+

@@ -497,7 +497,7 @@ function Storage:listDownloadedChapters(source, story)
             end
         end
     end
-    table.sort(chapters, function(a, b) return a.filename < b.filename end)
+    table.sort(chapters, function(a, b) return Util.naturalCompare(a.filename, b.filename) end)
     return chapters
 end
 
@@ -613,6 +613,15 @@ function Storage:mergeChapters(source, story, options)
                 end
             end
         end
+
+        -- Sắp xếp chương theo thứ tự tự nhiên (Natural Sort Order: 1, 2, 3... 9, 10, 11...)
+        table.sort(chapter_data, function(a, b)
+            return Util.naturalCompare(a.title or a.path, b.title or b.path)
+        end)
+        for idx, item in ipairs(chapter_data) do
+            item.index = idx
+        end
+
 
         -- 3. Viết Header HTML & CSS
         out_file:write("<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n")
