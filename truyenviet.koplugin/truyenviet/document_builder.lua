@@ -106,7 +106,7 @@ function DocumentBuilder:buildText(source, story, chapter, payload, is_temp)
         Util.escapeHtml(title),
         Util.escapeHtml(title),
         Util.escapeHtml(payload.url or chapter.url),
-        payload.content
+        Util.cleanChapterHtml(payload.content or "")
     )
 
     local ok, write_err = file:write(html)

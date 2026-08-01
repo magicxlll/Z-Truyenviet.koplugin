@@ -2039,10 +2039,11 @@ function Browser:downloadChapters(
             end
 
             view:updateItems()
+            local total_count = result.downloaded + (already_downloaded or 0)
             local message = string.format(
-                "Đã tải %d chương.\nBỏ qua %d chương đã có.",
+                "Đã hoàn tất tải %d chương mới (tổng %d chương).\n\nBạn có muốn GỘP CÁC CHƯƠNG THÀNH 1 FILE (EPUB/HTML) ngay bây giờ không?",
                 result.downloaded,
-                (already_downloaded or 0) + result.skipped
+                total_count
             )
             if #result.errors > 0 then
                 local shown = {}
@@ -2050,12 +2051,30 @@ function Browser:downloadChapters(
                     table.insert(shown, result.errors[index])
                 end
                 message = message
-                    .. string.format("\nLỗi %d chương:\n", #result.errors)
-                    .. table.concat(shown, "\n")
+                    .. string.format("\n(Lỗi %d chương:\n%s)", #result.errors, table.concat(shown, "\n"))
             end
-            UIManager:show(InfoMessage:new{
-                title = "Truyện Việt",
-                text = message })
+
+            local ConfirmBox = require("ui/widget/confirmbox")
+            UIManager:show(ConfirmBox:new{
+                title = "Truyện Việt - Hoàn Tất Tải Chương",
+                text = message,
+                ok_text = "Có, Gộp File Ngay",
+                cancel_text = "Để Sau",
+                ok_callback = function()
+                    local Util = require("truyenviet/helpers")
+                    local item = {
+                        source_id = source.id,
+                        story_slug = Util.urlLeaf(story.url, Util.safeName(story.title, "story")),
+                        chapter_count = total_count,
+                    }
+                    self:showMergeOptionsDialog(item, function()
+                        if view and view.updateItems then view:updateItems() end
+                    end)
+                end,
+                cancel_callback = function()
+                    if view and view.updateItems then view:updateItems() end
+                end,
+            })
         end)
     end)
 end

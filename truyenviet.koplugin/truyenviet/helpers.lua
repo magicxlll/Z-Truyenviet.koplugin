@@ -330,5 +330,58 @@ function Util.naturalCompare(strA, strB)
     return #c1 < #c2
 end
 
+function Util.cleanChapterHtml(content)
+    if not content or content == "" then return "" end
+    local s = tostring(content)
+
+    -- 1. Remove script, style, iframe, nav, header, footer elements
+    s = s:gsub("<script[^>]*>[%s%S]-</script>", "")
+    s = s:gsub("<style[^>]*>[%s%S]-</style>", "")
+    s = s:gsub("<iframe[^>]*>[%s%S]-</iframe>", "")
+    s = s:gsub("<nav[^>]*>[%s%S]-</nav>", "")
+
+    -- 2. Remove known ad/SEO text blocks & gambling keywords
+    local ad_keywords = {
+        "sunwin", "kubet", "cakhia", "88bet", "go88", "b52", "hitclub", "789club",
+        "fun88", "w88", "fb88", "shbet", "jun88", "hi88", "okvip", "new88", "79king", "kwin",
+        "signal:", "chauchau774", "lorangeteam", "comic24h", "sanyteam", "ungtycomic",
+        "navyteam", "ghientruyen", "rainbowbl", "conduongbachu", "cdbc",
+    }
+
+    local function isJunkLine(text)
+        local lower = text:lower()
+        for _, kw in ipairs(ad_keywords) do
+            if lower:find(kw, 1, true) then
+                return true
+            end
+        end
+        return false
+    end
+
+    -- Filter out <p> or <div> blocks containing ad keywords
+    local clean_blocks = {}
+    for tag_name, attrs, inner in s:gmatch("<(p)%s*([^>]*)>([%s%S]-)</p>") do
+        local plain = Util.stripTags(inner)
+        if plain ~= "" and not isJunkLine(plain) and not isJunkLine(attrs) then
+            table.insert(clean_blocks, "<p" .. (attrs ~= "" and (" " .. attrs) or "") .. ">" .. inner .. "</p>")
+        end
+    end
+
+    if #clean_blocks > 0 then
+        return table.concat(clean_blocks, "\n")
+    end
+
+    -- Fallback: line-by-line filtering if no <p> tags found
+    local lines = {}
+    for line in s:gmatch("[^\r\n]+") do
+        local plain = Util.stripTags(line)
+        if not isJunkLine(plain) then
+            table.insert(lines, line)
+        end
+    end
+    return table.concat(lines, "\n")
+end
+
 return Util
+
 
