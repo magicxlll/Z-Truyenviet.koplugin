@@ -515,7 +515,13 @@ function Storage:deleteChapters(source, story, chapter_filenames)
     return count
 end
 
-function Storage:mergeChaptersToEpub(source, story, output_path)
+function Storage:mergeChapters(source, story, options)
+    options = options or {}
+    local format = (options.format == "html") and "html" or "epub"
+    local include_cover = options.include_cover ~= false
+    local include_toc = options.include_toc ~= false
+    local delete_source_files = options.delete_source_files == true
+
     local ok, res, err_msg, chapters = pcall(function()
         local dir = self:getStoryDir(source, story)
         local chapters = self:listDownloadedChapters(source, story)
@@ -523,47 +529,57 @@ function Storage:mergeChaptersToEpub(source, story, output_path)
             return nil, "Không có chương nào để gộp"
         end
 
-        output_path = output_path or ffiutil.joinPath(self:getRootDir(), Util.safeName(story.title or story.url, "story") .. "_merged.epub")
+        local raw_name = options.output_filename
+        if not raw_name or raw_name == "" then
+            raw_name = Util.safeName(story.title or story.url, "story") .. "_gop"
+        else
+            raw_name = Util.safeName(raw_name, "story")
+        end
+
+        local output_filename = raw_name .. "." .. format
+        local output_path = ffiutil.joinPath(self:getRootDir(), output_filename)
+
         local out_file, err = io.open(output_path, "w")
         if not out_file then
             return nil, "Không thể tạo file gộp: " .. tostring(err)
         end
 
-        -- Tìm ảnh bìa trong cache hoặc thư mục truyện
+        -- 1. Tìm ảnh bìa trong cache hoặc thư mục truyện (nếu include_cover = true)
         local cover_b64 = nil
         local cover_mime = "image/jpeg"
-        local cover_path = nil
+        if include_cover then
+            local cover_path = nil
+            pcall(function()
+                local CoverCache = require("truyenviet/cover_cache")
+                cover_path = CoverCache:get(story)
+            end)
 
-        pcall(function()
-            local CoverCache = require("truyenviet/cover_cache")
-            cover_path = CoverCache:get(story)
-        end)
-
-        if not cover_path and lfs.attributes(dir, "mode") == "directory" then
-            for _, ext in ipairs({"jpg", "png", "webp", "jpeg"}) do
-                local p = ffiutil.joinPath(dir, "cover." .. ext)
-                if lfs.attributes(p, "mode") == "file" then
-                    cover_path = p
-                    break
+            if not cover_path and lfs.attributes(dir, "mode") == "directory" then
+                for _, ext in ipairs({"jpg", "png", "webp", "jpeg"}) do
+                    local p = ffiutil.joinPath(dir, "cover." .. ext)
+                    if lfs.attributes(p, "mode") == "file" then
+                        cover_path = p
+                        break
+                    end
                 end
             end
-        end
 
-        if cover_path then
-            local img_f = io.open(cover_path, "rb")
-            if img_f then
-                local data = img_f:read("*a")
-                img_f:close()
-                if data and #data > 0 then
-                    local ok_mime, mime = pcall(require, "mime")
-                    if ok_mime and mime and type(mime.b64) == "function" then
-                        local ok_b64, b64_res = pcall(mime.b64, data)
-                        if ok_b64 and b64_res then
-                            cover_b64 = b64_res
-                            if cover_path:find("%.png$") then
-                                cover_mime = "image/png"
-                            elseif cover_path:find("%.webp$") then
-                                cover_mime = "image/webp"
+            if cover_path then
+                local img_f = io.open(cover_path, "rb")
+                if img_f then
+                    local data = img_f:read("*a")
+                    img_f:close()
+                    if data and #data > 0 then
+                        local ok_mime, mime = pcall(require, "mime")
+                        if ok_mime and mime and type(mime.b64) == "function" then
+                            local ok_b64, b64_res = pcall(mime.b64, data)
+                            if ok_b64 and b64_res then
+                                cover_b64 = b64_res
+                                if cover_path:find("%.png$") then
+                                    cover_mime = "image/png"
+                                elseif cover_path:find("%.webp$") then
+                                    cover_mime = "image/webp"
+                                end
                             end
                         end
                     end
@@ -571,7 +587,7 @@ function Storage:mergeChaptersToEpub(source, story, output_path)
             end
         end
 
-        -- Bóc tách danh sách tiêu đề & nội dung các chương
+        -- 2. Bóc tách danh sách tiêu đề & nội dung các chương
         local chapter_data = {}
         for i, chap in ipairs(chapters) do
             local f = io.open(chap.path, "r")
@@ -598,7 +614,7 @@ function Storage:mergeChaptersToEpub(source, story, output_path)
             end
         end
 
-        -- Viết Header HTML & CSS
+        -- 3. Viết Header HTML & CSS
         out_file:write("<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n")
         out_file:write("<title>" .. Util.encodeHtml(story.title or "Truyện") .. "</title>\n")
         out_file:write("<style>\n")
@@ -614,29 +630,33 @@ function Storage:mergeChaptersToEpub(source, story, output_path)
         out_file:write("  .chapter-block { page-break-before: always; padding-top: 15px; }\n")
         out_file:write("</style>\n</head>\n<body>\n")
 
-        -- 1. TRANG BÌA (COVER PAGE)
-        if cover_b64 then
-            out_file:write("<div class=\"cover-box\">\n")
-            out_file:write("  <img src=\"data:" .. cover_mime .. ";base64," .. cover_b64 .. "\" alt=\"Cover\" />\n")
-            out_file:write("  <h1 class=\"story-main-title\">" .. Util.encodeHtml(story.title or "Truyện") .. "</h1>\n")
-            out_file:write("</div>\n")
-        else
-            out_file:write("<div class=\"cover-box\">\n")
-            out_file:write("  <h1 class=\"story-main-title\">" .. Util.encodeHtml(story.title or "Truyện") .. "</h1>\n")
+        -- TRANG BÌA (COVER PAGE)
+        if include_cover then
+            if cover_b64 then
+                out_file:write("<div class=\"cover-box\">\n")
+                out_file:write("  <img src=\"data:" .. cover_mime .. ";base64," .. cover_b64 .. "\" alt=\"Cover\" />\n")
+                out_file:write("  <h1 class=\"story-main-title\">" .. Util.encodeHtml(story.title or "Truyện") .. "</h1>\n")
+                out_file:write("</div>\n")
+            else
+                out_file:write("<div class=\"cover-box\">\n")
+                out_file:write("  <h1 class=\"story-main-title\">" .. Util.encodeHtml(story.title or "Truyện") .. "</h1>\n")
+                out_file:write("</div>\n")
+            end
+        end
+
+        -- MỤC LỤC TRUYỆN (TABLE OF CONTENTS)
+        if include_toc then
+            out_file:write("<div class=\"toc-box\">\n")
+            out_file:write("  <h2 class=\"toc-title\">MỤC LỤC TRUYỆN</h2>\n")
+            out_file:write("  <ul class=\"toc-list\">\n")
+            for _, item in ipairs(chapter_data) do
+                out_file:write("    <li class=\"toc-item\"><a href=\"#chap_" .. item.index .. "\">" .. Util.encodeHtml(item.title) .. "</a></li>\n")
+            end
+            out_file:write("  </ul>\n")
             out_file:write("</div>\n")
         end
 
-        -- 2. MỤC LỤC TRUYỆN (TABLE OF CONTENTS) AT FRONT
-        out_file:write("<div class=\"toc-box\">\n")
-        out_file:write("  <h2 class=\"toc-title\">MỤC LỤC TRUYỆN</h2>\n")
-        out_file:write("  <ul class=\"toc-list\">\n")
-        for _, item in ipairs(chapter_data) do
-            out_file:write("    <li class=\"toc-item\"><a href=\"#chap_" .. item.index .. "\">" .. Util.encodeHtml(item.title) .. "</a></li>\n")
-        end
-        out_file:write("  </ul>\n")
-        out_file:write("</div>\n")
-
-        -- 3. NỘI DUNG CÁC CHƯƠNG TRUYỆN
+        -- NỘI DUNG CÁC CHƯƠNG TRUYỆN
         for _, item in ipairs(chapter_data) do
             out_file:write("<div id=\"chap_" .. item.index .. "\" class=\"chapter-block\">\n")
             out_file:write(item.body .. "\n")
@@ -645,6 +665,19 @@ function Storage:mergeChaptersToEpub(source, story, output_path)
 
         out_file:write("</body>\n</html>\n")
         out_file:close()
+
+        -- 4. Xóa file gốc nếu được bật
+        if delete_source_files then
+            pcall(function()
+                for f in lfs.dir(dir) do
+                    if f ~= "." and f ~= ".." then
+                        os.remove(dir .. "/" .. f)
+                    end
+                end
+                lfs.rmdir(dir)
+            end)
+        end
+
         return output_path, nil, chapters
     end)
 
@@ -655,6 +688,17 @@ function Storage:mergeChaptersToEpub(source, story, output_path)
     end
 end
 
+function Storage:mergeChaptersToEpub(source, story, output_path)
+    return self:mergeChapters(source, story, {
+        format = "epub",
+        include_cover = true,
+        include_toc = true,
+        output_filename = output_path,
+        delete_source_files = false,
+    })
+end
+
 return Storage
+
 
 

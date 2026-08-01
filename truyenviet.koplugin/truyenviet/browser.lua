@@ -3793,6 +3793,185 @@ function Browser:showFirecrawlKeyDialog(on_return)
     UIManager:show(dialog)
 end
 
+function Browser:showMergeOptionsDialog(item, on_return)
+    local Storage = require("truyenviet/storage")
+    local source = { id = item.source_id }
+    local story = { title = item.story_slug, url = item.story_slug }
+    
+    local default_name = (item.story_slug or "truyen"):gsub("[^%w_]", "_") .. "_gop"
+    local options = {
+        format = "epub",              -- "epub" or "html"
+        include_cover = true,         -- boolean
+        include_toc = true,           -- boolean
+        output_filename = default_name,
+        delete_source_files = false,  -- boolean
+    }
+
+    local function refreshMenu()
+        local items = {
+            {
+                text = "1. Định dạng file: [ " .. options.format:upper() .. " (." .. options.format .. ") ]",
+                callback = function()
+                    options.format = (options.format == "epub") and "html" or "epub"
+                    refreshMenu()
+                end,
+            },
+            {
+                text = "2. Bao gồm Ảnh bìa: [ " .. (options.include_cover and "☑ BẬT" or "☐ TẮT") .. " ]",
+                callback = function()
+                    options.include_cover = not options.include_cover
+                    refreshMenu()
+                end,
+            },
+            {
+                text = "3. Tạo Mục lục (Links nhảy): [ " .. (options.include_toc and "☑ BẬT" or "☐ TẮT") .. " ]",
+                callback = function()
+                    options.include_toc = not options.include_toc
+                    refreshMenu()
+                end,
+            },
+            {
+                text = "4. Tên file xuất ra: [ " .. options.output_filename .. "." .. options.format .. " ]",
+                callback = function()
+                    local InputDialog = require("ui/widget/inputdialog")
+                    local dlg
+                    dlg = InputDialog:new{
+                        title = "Nhập tên file xuất ra",
+                        description = "Tên file (không cần nhập đuôi file):",
+                        input = options.output_filename,
+                        buttons = {
+                            {
+                                { text = "Hủy", callback = function() UIManager:close(dlg) end },
+                                {
+                                    text = "Đồng ý",
+                                    is_default = true,
+                                    callback = function()
+                                        local val = dlg:getInputText():match("^%s*(.-)%s*$")
+                                        if val and val ~= "" then
+                                            options.output_filename = val
+                                        end
+                                        UIManager:close(dlg)
+                                        refreshMenu()
+                                    end,
+                                },
+                            }
+                        }
+                    }
+                    UIManager:show(dlg)
+                end,
+            },
+            {
+                text = "5. Xóa các file chương gốc sau khi gộp: [ " .. (options.delete_source_files and "☑ BẬT" or "☐ TẮT") .. " ]",
+                callback = function()
+                    options.delete_source_files = not options.delete_source_files
+                    refreshMenu()
+                end,
+            },
+            {
+                text = "🚀 BẮT ĐẦU GỘP FILE",
+                mandatory = "Thực hiện",
+                callback = function()
+                    local Trapper = require("ui/trapper")
+                    local completed, out_path, err, chapters = Trapper:dismissableRunInSubprocess(
+                        function()
+                            return Storage:mergeChapters(source, story, options)
+                        end,
+                        "Đang xử lý & gộp file (" .. options.format:upper() .. ")..."
+                    )
+
+                    if not completed then
+                        UIManager:show(InfoMessage:new{ title = "Truyện Việt", text = "Đã hủy thao tác gộp file." })
+                        return
+                    end
+
+                    if out_path then
+                        local msg = string.format("Đã gộp thành công %d chương (%s)!\n\nLưu tại:\n%s", #(chapters or {}), options.format:upper(), tostring(out_path))
+                        if options.delete_source_files then
+                            msg = msg .. "\n\n(Đã tự động xóa các file chương gốc)"
+                        end
+                        UIManager:show(InfoMessage:new{
+                            title = "Truyện Việt - Thành công",
+                            text = msg,
+                        })
+                        if on_return then on_return() end
+                    else
+                        showError("Lỗi gộp file: " .. tostring(err))
+                    end
+                end,
+            },
+        }
+
+        local view = ListView:new{
+            title = "⚙️ Cấu Hình Gộp File: " .. item.story_slug,
+            item_table = items,
+            on_return_callback = on_return,
+        }
+        UIManager:show(view)
+    end
+
+    refreshMenu()
+end
+
+function Browser:showDownloadedStoryChapters(item, on_return)
+    local Storage = require("truyenviet/storage")
+    local source = { id = item.source_id }
+    local story = { title = item.story_slug, url = item.story_slug }
+    local chapters = Storage:listDownloadedChapters(source, story)
+
+    if #chapters == 0 then
+        UIManager:show(InfoMessage:new{ title = "Truyện Việt", text = "Không còn file chương nào." })
+        if on_return then on_return() end
+        return
+    end
+
+    local items = {}
+    for i, chap in ipairs(chapters) do
+        local current_chap = chap
+        local size_kb = string.format("%.1f KB", (chap.size or 0) / 1024)
+        table.insert(items, {
+            text = string.format("[%d] %s (%s)", i, chap.filename, size_kb),
+            callback = function()
+                local ButtonDialog = require("ui/widget/buttondialog")
+                local dlg
+                dlg = ButtonDialog:new{
+                    title = chap.filename,
+                    text = "Dung lượng: " .. size_kb,
+                    buttons = {
+                        {
+                            {
+                                text = "📖 Đọc chương này",
+                                callback = function()
+                                    UIManager:close(dlg)
+                                    Reader:show(current_chap.path, function()
+                                        self:showDownloadedStoryChapters(item, on_return)
+                                    end)
+                                end,
+                            },
+                            {
+                                text = "🗑️ Xóa chương này",
+                                callback = function()
+                                    UIManager:close(dlg)
+                                    os.remove(current_chap.path)
+                                    UIManager:show(InfoMessage:new{ title = "Truyện Việt", text = "Đã xóa " .. current_chap.filename })
+                                    self:showDownloadedStoryChapters(item, on_return)
+                                end,
+                            },
+                        }
+                    }
+                }
+                UIManager:show(dlg)
+            end,
+        })
+    end
+
+    local view = ListView:new{
+        title = "📋 Danh Sách Chương (" .. #chapters .. " chương)",
+        item_table = items,
+        on_return_callback = on_return,
+    }
+    UIManager:show(view)
+end
+
 function Browser:showDownloadedManager(on_return)
     Storage:initialize()
     local stories = Storage:listDownloadedStories()
@@ -3820,41 +3999,25 @@ function Browser:showDownloadedManager(on_return)
                     buttons = {
                         {
                             {
-                                text = "Gộp các chương thành 1 file EPUB/HTML",
+                                text = "⚙️ Gộp file (EPUB/HTML)...",
                                 callback = function()
                                     UIManager:close(sub_dialog)
-                                    local source = { id = item.source_id }
-                                    local story = { title = item.story_slug, url = item.story_slug }
-                                    local out_path, err, chapters = Storage:mergeChaptersToEpub(source, story)
-                                    if out_path then
-                                        local ConfirmBox = require("ui/widget/confirmbox")
-                                        UIManager:show(ConfirmBox:new{
-                                            title = "Truyện Việt - Gộp File Thành Công",
-                                            text = string.format("Đã gộp thành công %d chương có Ảnh bìa & Mục lục ở đầu sách!\n\nLưu tại:\n%s\n\nBạn có muốn XÓA TẤT CẢ các file chương gốc đã gộp để tiết kiệm dung lượng không?", #(chapters or {}), tostring(out_path)),
-                                            ok_text = "Xóa các file gốc",
-                                            cancel_text = "Giữ lại file gốc",
-                                            ok_callback = function()
-                                                local lfs = require("libs/libkoreader-lfs")
-                                                for f in lfs.dir(item.dir_path) do
-                                                    if f ~= "." and f ~= ".." then
-                                                        os.remove(item.dir_path .. "/" .. f)
-                                                    end
-                                                end
-                                                lfs.rmdir(item.dir_path)
-                                                UIManager:show(InfoMessage:new{ title = "Truyện Việt", text = "Đã xóa xong các file chương gốc." })
-                                                if on_return then on_return() end
-                                            end,
-                                            cancel_callback = function()
-                                                if on_return then on_return() end
-                                            end,
-                                        })
-                                    else
-                                        showError("Lỗi gộp file: " .. tostring(err))
-                                    end
+                                    self:showMergeOptionsDialog(item, function()
+                                        self:showDownloadedManager(on_return)
+                                    end)
                                 end,
                             },
                             {
-                                text = "Xóa tất cả chương của truyện này",
+                                text = "📋 Xem & xóa từng chương...",
+                                callback = function()
+                                    UIManager:close(sub_dialog)
+                                    self:showDownloadedStoryChapters(item, function()
+                                        self:showDownloadedManager(on_return)
+                                    end)
+                                end,
+                            },
+                            {
+                                text = "🗑️ Xóa tất cả chương của truyện này",
                                 callback = function()
                                     UIManager:close(sub_dialog)
                                     local ConfirmBox = require("ui/widget/confirmbox")
@@ -3891,6 +4054,7 @@ function Browser:showDownloadedManager(on_return)
     }
     UIManager:show(view)
 end
+
 
 function Browser:showAdvancedSettings(on_return)
     Storage:initialize()
