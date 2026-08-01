@@ -2119,6 +2119,9 @@ function Browser:confirmDownloadChapters(view, page_data, source)
                             end
                             local Util = require("truyenviet/helpers")
                             all_chapters = Util.uniqueBy(all_chapters or {}, "url")
+                            table.sort(all_chapters, function(a, b)
+                                return Util.naturalCompare(a.title or a.url, b.title or b.url)
+                            end)
                             fetch_ok = true
                             return true
                         end)

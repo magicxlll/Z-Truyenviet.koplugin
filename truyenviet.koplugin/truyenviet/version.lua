@@ -1,5 +1,6 @@
--- Internal Dev Tracking: BUILD_NUMBER = "1349"
-return "3.7.8"
+-- Internal Dev Tracking: BUILD_NUMBER = "1350"
+return "3.7.9"
+
 
 
 

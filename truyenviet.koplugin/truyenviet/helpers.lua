@@ -345,7 +345,7 @@ function Util.cleanChapterHtml(content)
         "sunwin", "kubet", "cakhia", "88bet", "go88", "b52", "hitclub", "789club",
         "fun88", "w88", "fb88", "shbet", "jun88", "hi88", "okvip", "new88", "79king", "kwin",
         "signal:", "chauchau774", "lorangeteam", "comic24h", "sanyteam", "ungtycomic",
-        "navyteam", "ghientruyen", "rainbowbl", "conduongbachu", "cdbc",
+        "navyteam", "ghientruyen", "rainbowbl",
     }
 
     local function isJunkLine(text)

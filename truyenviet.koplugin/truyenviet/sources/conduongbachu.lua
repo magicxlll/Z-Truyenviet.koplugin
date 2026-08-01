@@ -110,10 +110,7 @@ local function uniqueChapters(chapters)
         end
     end
     table.sort(unique, function(a, b)
-        if a.number ~= b.number then
-            return a.number < b.number
-        end
-        return a.url < b.url
+        return Util.naturalCompare(a.title or a.url, b.title or b.url)
     end)
     return unique
 end
