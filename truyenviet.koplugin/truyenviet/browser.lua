@@ -3987,62 +3987,60 @@ function Browser:showDownloadedManager(on_return)
 
     local items = {}
     for _, item in ipairs(stories) do
-        local size_mb = string.format("%.2f MB", (item.total_bytes or 0) / (1024 * 1024))
+        local cur_item = item
+        local size_mb = string.format("%.2f MB", (cur_item.total_bytes or 0) / (1024 * 1024))
         table.insert(items, {
-            text = string.format("[%s] %s (%d chương - %s)", item.source_id, item.story_slug, item.chapter_count, size_mb),
+            text = string.format("[%s] %s (%d chương - %s)", cur_item.source_id, cur_item.story_slug, cur_item.chapter_count, size_mb),
             callback = function()
-                local ButtonDialog = require("ui/widget/buttondialog")
-                local sub_dialog
-                sub_dialog = ButtonDialog:new{
-                    title = item.story_slug,
-                    text = string.format("Nguồn: %s\nSố chương: %d\nDung lượng: %s", item.source_id, item.chapter_count, size_mb),
-                    buttons = {
-                        {
-                            {
-                                text = "⚙️ Gộp file (EPUB/HTML)...",
-                                callback = function()
-                                    UIManager:close(sub_dialog)
-                                    self:showMergeOptionsDialog(item, function()
-                                        self:showDownloadedManager(on_return)
-                                    end)
+                local story_menu_items = {
+                    {
+                        text = "⚙️ Gộp file (Tùy chọn EPUB/HTML, Bìa, Mục lục, Tên file...)",
+                        callback = function()
+                            self:showMergeOptionsDialog(cur_item, function()
+                                self:showDownloadedManager(on_return)
+                            end)
+                        end,
+                    },
+                    {
+                        text = "📋 Xem & Xóa từng chương lẻ (" .. cur_item.chapter_count .. " chương)",
+                        callback = function()
+                            self:showDownloadedStoryChapters(cur_item, function()
+                                self:showDownloadedManager(on_return)
+                            end)
+                        end,
+                    },
+                    {
+                        text = "🗑️ Xóa tất cả chương của truyện này",
+                        callback = function()
+                            local ConfirmBox = require("ui/widget/confirmbox")
+                            UIManager:show(ConfirmBox:new{
+                                text = "Xóa tất cả chương đã tải của " .. cur_item.story_slug .. "?",
+                                ok_text = "Xóa",
+                                cancel_text = "Hủy",
+                                ok_callback = function()
+                                    local lfs = require("libs/libkoreader-lfs")
+                                    for f in lfs.dir(cur_item.dir_path) do
+                                        if f ~= "." and f ~= ".." then
+                                            os.remove(cur_item.dir_path .. "/" .. f)
+                                        end
+                                    end
+                                    lfs.rmdir(cur_item.dir_path)
+                                    UIManager:show(InfoMessage:new{ title = "Truyện Việt", text = "Đã xóa xong." })
+                                    self:showDownloadedManager(on_return)
                                 end,
-                            },
-                            {
-                                text = "📋 Xem & xóa từng chương...",
-                                callback = function()
-                                    UIManager:close(sub_dialog)
-                                    self:showDownloadedStoryChapters(item, function()
-                                        self:showDownloadedManager(on_return)
-                                    end)
-                                end,
-                            },
-                            {
-                                text = "🗑️ Xóa tất cả chương của truyện này",
-                                callback = function()
-                                    UIManager:close(sub_dialog)
-                                    local ConfirmBox = require("ui/widget/confirmbox")
-                                    UIManager:show(ConfirmBox:new{
-                                        text = "Xóa tất cả chương đã tải của " .. item.story_slug .. "?",
-                                        ok_text = "Xóa",
-                                        cancel_text = "Hủy",
-                                        ok_callback = function()
-                                            local lfs = require("libs/libkoreader-lfs")
-                                            for f in lfs.dir(item.dir_path) do
-                                                if f ~= "." and f ~= ".." then
-                                                    os.remove(item.dir_path .. "/" .. f)
-                                                end
-                                            end
-                                            lfs.rmdir(item.dir_path)
-                                            UIManager:show(InfoMessage:new{ title = "Truyện Việt", text = "Đã xóa xong." })
-                                            if on_return then on_return() end
-                                        end,
-                                    })
-                                end,
-                            },
-                        }
-                    }
+                            })
+                        end,
+                    },
                 }
-                UIManager:show(sub_dialog)
+
+                local story_view = ListView:new{
+                    title = "Truyện: " .. cur_item.story_slug .. " (" .. cur_item.chapter_count .. " chương)",
+                    item_table = story_menu_items,
+                    on_return_callback = function()
+                        self:showDownloadedManager(on_return)
+                    end,
+                }
+                UIManager:show(story_view)
             end,
         })
     end
@@ -4054,6 +4052,7 @@ function Browser:showDownloadedManager(on_return)
     }
     UIManager:show(view)
 end
+
 
 
 function Browser:showAdvancedSettings(on_return)
