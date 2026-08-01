@@ -43,15 +43,17 @@ function DocumentBuilder:getTempPath(source, story, chapter)
     return nil
 end
 
-function DocumentBuilder:getExistingPath(source, story, chapter)
+function DocumentBuilder:getExistingPath(source, story, chapter, is_temp)
     local path = Storage:getChapterPath(source, story, chapter)
     if lfs.attributes(path, "mode") == "file" then
         return path
     end
     
-    local temp_path = self:getTempPath(source, story, chapter)
-    if temp_path and lfs.attributes(temp_path, "mode") == "file" then
-        return temp_path
+    if is_temp then
+        local temp_path = self:getTempPath(source, story, chapter)
+        if temp_path and lfs.attributes(temp_path, "mode") == "file" then
+            return temp_path
+        end
     end
 end
 
@@ -306,7 +308,7 @@ function DocumentBuilder:build(source, story, chapter, payload, force, is_temp)
         payload = { content = payload }
     end
     if not force then
-        local existing = self:getExistingPath(source, story, chapter)
+        local existing = self:getExistingPath(source, story, chapter, is_temp)
         if existing then
             return existing
         end
