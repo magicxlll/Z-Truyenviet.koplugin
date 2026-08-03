@@ -1,7 +1,10 @@
 local Http = require("truyenviet/http_client")
 local Util = require("truyenviet/helpers")
 local ko_util = require("util")
-local json = require("json")
+local ok_json, json = pcall(require, "json")
+if not ok_json or not json then
+    ok_json, json = pcall(require, "dkjson")
+end
 
 local Source = {
     id = "giatocvuongtai",

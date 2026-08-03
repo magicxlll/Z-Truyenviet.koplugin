@@ -40,38 +40,48 @@ function TruyenViet:init()
     end)
 
     Dispatcher:registerAction("start_truyenviet", {
-        category = "none",
+        category = "tools",
         event = "StartTruyenViet",
-        title = "🔥 Truyện Việt v" .. Version,
+        title = "🔥 Truyện Việt",
         general = true,
+        reader = true,
+        filemanager = true,
     })
 
     Dispatcher:registerAction("truyenviet_chapter_list", {
-        category = "none",
+        category = "tools",
         event = "TruyenVietBackToChapters",
         title = "📋 Truyện Việt: Danh sách chương",
         general = true,
+        reader = true,
+        filemanager = true,
     })
 
     Dispatcher:registerAction("truyenviet_continue", {
-        category = "none",
+        category = "tools",
         event = "TruyenVietContinue",
         title = "📖 Truyện Việt: Tiếp tục đọc",
         general = true,
+        reader = true,
+        filemanager = true,
     })
 
     Dispatcher:registerAction("truyenviet_history", {
-        category = "none",
+        category = "tools",
         event = "TruyenVietHistory",
         title = "📜 Truyện Việt: Lịch sử đọc",
         general = true,
+        reader = true,
+        filemanager = true,
     })
 
     Dispatcher:registerAction("truyenviet_downloaded", {
-        category = "none",
+        category = "tools",
         event = "TruyenVietDownloaded",
         title = "💾 Truyện Việt: Đã tải xuống",
         general = true,
+        reader = true,
+        filemanager = true,
     })
 end
 

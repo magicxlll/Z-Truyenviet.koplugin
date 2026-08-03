@@ -86,15 +86,42 @@ function DocumentBuilder:buildText(source, story, chapter, payload, is_temp)
       font-family: 'ComicHelvetic-Light';
       src: url('ComicHelvetic-Light.ttf');
     }
-    body, p, div, article, h1, h2, h3, h4, h5, h6 {
+    html, body {
+      margin: 0;
+      padding: 0 0.3em;
       font-family: 'ComicHelvetic-Light', 'ComicHelvetic', sans-serif !important;
-      line-height: 1.65;
-      margin: 5%%;
+      line-height: 1.6;
       text-align: justify;
+      word-wrap: break-word;
     }
-    h1 { font-size: 1.35em; line-height: 1.3; text-align: center; }
-    .source { color: #666; font-size: 0.8em; text-align: center; }
-    img { height: auto; max-width: 100%%; }
+    h1 {
+      font-size: 1.35em;
+      line-height: 1.3;
+      text-align: center;
+      margin: 0.8em 0 0.4em 0;
+    }
+    .source {
+      color: #666;
+      font-size: 0.85em;
+      text-align: center;
+      margin-bottom: 0.8em;
+    }
+    article {
+      margin: 0;
+      padding: 0;
+    }
+    p {
+      margin: 0.6em 0;
+      padding: 0;
+      text-indent: 1.5em;
+      line-height: 1.6;
+    }
+    img {
+      height: auto;
+      max-width: 100%%;
+      display: block;
+      margin: 0.5em auto;
+    }
   </style>
 </head>
 <body>
