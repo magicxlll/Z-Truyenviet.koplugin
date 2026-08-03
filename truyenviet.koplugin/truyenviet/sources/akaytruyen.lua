@@ -1,7 +1,6 @@
 local Http = require("truyenviet/http_client")
 local Util = require("truyenviet/helpers")
 local ko_util = require("util")
-local json = require("json")
 
 local Source = {
     id = "akaytruyen",
@@ -566,8 +565,8 @@ local function chapterEndpoint(story, page)
 end
 
 local function decodeChapterFragment(raw)
-    local ok, payload = pcall(json.decode, raw)
-    if ok and type(payload) == "table" and type(payload.html) == "string" then
+    local payload = Util.parseJson(raw)
+    if type(payload) == "table" and type(payload.html) == "string" then
         return payload.html
     end
     return nil, "Phản hồi danh sách chương AkayTruyen không hợp lệ"

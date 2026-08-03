@@ -3,6 +3,18 @@ local ko_util = require("util")
 
 local Util = {}
 
+function Util.urlEncode(str)
+    if not str then return "" end
+    str = tostring(str)
+    return str:gsub("([^%w%-%_%.%~])", function(c)
+        return string.format("%%%02X", string.byte(c))
+    end)
+end
+
+if not ko_util.urlEncode then
+    ko_util.urlEncode = Util.urlEncode
+end
+
 local VIETNAMESE_ASCII = {
     ["à"] = "a", ["á"] = "a", ["ạ"] = "a", ["ả"] = "a", ["ã"] = "a",
     ["â"] = "a", ["ầ"] = "a", ["ấ"] = "a", ["ậ"] = "a", ["ẩ"] = "a", ["ẫ"] = "a",
@@ -380,6 +392,26 @@ function Util.cleanChapterHtml(content)
         end
     end
     return table.concat(lines, "\n")
+end
+
+function Util.parseJson(str)
+    if not str or str == "" then return nil end
+    local ok_util, ko_util = pcall(require, "util")
+    if ok_util and ko_util and type(ko_util.jsonDecode) == "function" then
+        local ok, data = pcall(ko_util.jsonDecode, str)
+        if ok and data then return data end
+    end
+    local ok_j, json = pcall(require, "json")
+    if ok_j and json and type(json.decode) == "function" then
+        local ok2, data2 = pcall(json.decode, str)
+        if ok2 and data2 then return data2 end
+    end
+    local ok_dk, dkjson = pcall(require, "dkjson")
+    if ok_dk and dkjson and type(dkjson.decode) == "function" then
+        local ok3, data3 = pcall(dkjson.decode, str)
+        if ok3 and data3 then return data3 end
+    end
+    return nil
 end
 
 return Util

@@ -1,7 +1,6 @@
 local Http = require("truyenviet/http_client")
 local Util = require("truyenviet/helpers")
 local ko_util = require("util")
-local dkjson = require("json")
 
 -- Storya.click — Trang đọc truyện Next.js Client-rendered với REST API JSON
 local Source = {
@@ -18,8 +17,8 @@ local function apiGet(endpoint)
         ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
     })
     if not res then return nil, err end
-    local ok, parsed = pcall(dkjson.decode, res)
-    if not ok or type(parsed) ~= "table" then
+    local parsed = Util.parseJson(res)
+    if type(parsed) ~= "table" then
         return nil, "Lỗi giải mã JSON từ Storya API"
     end
     return parsed

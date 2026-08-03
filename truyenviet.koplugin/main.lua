@@ -40,7 +40,7 @@ function TruyenViet:init()
     end)
 
     Dispatcher:registerAction("start_truyenviet", {
-        category = "tools",
+        category = "general",
         event = "StartTruyenViet",
         title = "🔥 Truyện Việt",
         general = true,
@@ -49,7 +49,7 @@ function TruyenViet:init()
     })
 
     Dispatcher:registerAction("truyenviet_chapter_list", {
-        category = "tools",
+        category = "general",
         event = "TruyenVietBackToChapters",
         title = "📋 Truyện Việt: Danh sách chương",
         general = true,
@@ -58,7 +58,7 @@ function TruyenViet:init()
     })
 
     Dispatcher:registerAction("truyenviet_continue", {
-        category = "tools",
+        category = "general",
         event = "TruyenVietContinue",
         title = "📖 Truyện Việt: Tiếp tục đọc",
         general = true,
@@ -67,7 +67,7 @@ function TruyenViet:init()
     })
 
     Dispatcher:registerAction("truyenviet_history", {
-        category = "tools",
+        category = "general",
         event = "TruyenVietHistory",
         title = "📜 Truyện Việt: Lịch sử đọc",
         general = true,
@@ -76,7 +76,7 @@ function TruyenViet:init()
     })
 
     Dispatcher:registerAction("truyenviet_downloaded", {
-        category = "tools",
+        category = "general",
         event = "TruyenVietDownloaded",
         title = "💾 Truyện Việt: Đã tải xuống",
         general = true,

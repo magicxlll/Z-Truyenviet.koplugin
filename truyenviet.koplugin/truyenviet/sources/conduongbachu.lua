@@ -116,9 +116,8 @@ local function uniqueChapters(chapters)
 end
 
 local function parseWpPosts(raw, base_url, source_id, story_url)
-    local json = require("json")
-    local ok, posts = pcall(json.decode, raw)
-    if not ok or type(posts) ~= "table" then
+    local posts = Util.parseJson(raw)
+    if type(posts) ~= "table" then
         return nil
     end
 

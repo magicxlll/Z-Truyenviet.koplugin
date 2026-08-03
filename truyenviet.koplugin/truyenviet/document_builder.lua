@@ -86,9 +86,11 @@ function DocumentBuilder:buildText(source, story, chapter, payload, is_temp)
       font-family: 'ComicHelvetic-Light';
       src: url('ComicHelvetic-Light.ttf');
     }
-    html, body {
-      margin: 0;
-      padding: 0 0.3em;
+    html, body, article, div {
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
       font-family: 'ComicHelvetic-Light', 'ComicHelvetic', sans-serif !important;
       line-height: 1.6;
       text-align: justify;
@@ -106,15 +108,15 @@ function DocumentBuilder:buildText(source, story, chapter, payload, is_temp)
       text-align: center;
       margin-bottom: 0.8em;
     }
-    article {
-      margin: 0;
-      padding: 0;
-    }
     p {
-      margin: 0.6em 0;
-      padding: 0;
-      text-indent: 1.5em;
-      line-height: 1.6;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      margin-top: 0.6em !important;
+      margin-bottom: 0.6em !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      text-indent: 1.5em !important;
+      line-height: 1.6 !important;
     }
     img {
       height: auto;

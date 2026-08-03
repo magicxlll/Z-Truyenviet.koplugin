@@ -70,6 +70,22 @@ end
 Source.getLatest = Source.getHome
 Source.getCompleted = Source.getHome
 
+function Source:search(query)
+    local listing = self.getHome()
+    if not listing or not listing.stories then
+        return {}
+    end
+    local results = {}
+    local norm_q = Util.normalizeSearch(query)
+    for _, story in ipairs(listing.stories) do
+        local norm_t = Util.normalizeSearch(story.title)
+        if norm_t:find(norm_q, 1, true) then
+            table.insert(results, story)
+        end
+    end
+    return results
+end
+
 function Source:getStoryPage(story, page)
     local html, err = mizzyaGet(story.url)
     if not html then
