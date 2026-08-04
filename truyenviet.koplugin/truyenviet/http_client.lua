@@ -2,7 +2,10 @@ local http = require("socket.http")
 local ltn12 = require("ltn12")
 local socket = require("socket")
 local socket_url = require("socket.url")
-local socketutil = require("socketutil")
+local ok_su, socketutil = pcall(require, "socketutil")
+if not ok_su or type(socketutil) ~= "table" then
+    socketutil = {}
+end
 local ko_util = require("util")
 local Debug = require("truyenviet/debugger")
 
@@ -123,10 +126,10 @@ if not http._original_request then
             end
             local success, r1, r2, r3, r4 = pcall(http._original_request, reqt, body)
             http.PROXY = old_proxy
-            if success then
+            if success and r1 ~= nil then
                 return r1, r2, r3, r4
             else
-                error(r1)
+                return nil, tostring(r1 or "Connection failed")
             end
         end
     end
@@ -256,7 +259,9 @@ function HttpClient:request(method, url, body, headers, options)
     local result_code, result_headers, result_status
     local sink = {}
 
-    socketutil:set_timeout(self.connect_timeout, self.total_timeout)
+    if type(socketutil.set_timeout) == "function" then
+        pcall(socketutil.set_timeout, socketutil, self.connect_timeout, self.total_timeout)
+    end
     for attempt = 1, max_retries + 1 do
         sink = {}
         ok, code, response_headers, status = pcall(function()
@@ -306,7 +311,9 @@ function HttpClient:request(method, url, body, headers, options)
         end
     end
 
-    socketutil:reset_timeout()
+    if type(socketutil.reset_timeout) == "function" then
+        pcall(socketutil.reset_timeout, socketutil)
+    end
 
     if not ok or response_headers == nil or code == socketutil.SSL_HANDSHAKE_CODE or code == socketutil.TIMEOUT_CODE then
         local err_msg = not ok and tostring(code) or tostring(code)
