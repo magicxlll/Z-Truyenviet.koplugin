@@ -61,12 +61,28 @@ local function cleanVirealContent(raw_chunk)
 end
 
 local function apiQuery(query, variables)
-    local payload = {
-        operationName = query:match("query%s+([a-zA-Z0-9_]+)"),
-        query = query,
-        variables = variables or {}
-    }
-    local res, err = Http:post("https://api.vireal.vn/graphql", ko_util.jsonEncode(payload), {
+    local operationName = query:match("query%s+([a-zA-Z0-9_]+)")
+    local vars_str = "{}"
+    if variables then
+        if variables.slug then
+            vars_str = '{"slug":"' .. variables.slug .. '"}'
+        elseif variables.filters then
+            local search_str = ""
+            if variables.filters.search then
+                search_str = ',"search":"' .. variables.filters.search:gsub('"', '\\"') .. '"'
+            end
+            vars_str = '{"page":' .. (variables.page or 1) .. ',"limit":' .. (variables.limit or 30) .. ',"filters":{"type":2' .. search_str .. '}}'
+        end
+    end
+    
+    local query_escaped = query:gsub('\n', ' '):gsub('\r', ''):gsub('"', '\\"'):gsub('\t', ' ')
+    local payload_str = string.format('{"operationName":"%s","query":"%s","variables":%s}', 
+        operationName or "", 
+        query_escaped, 
+        vars_str
+    )
+
+    local res, err = Http:post("https://api.vireal.vn/graphql", payload_str, {
         ["Content-Type"] = "application/json",
         ["x-api-key"] = "TOIYEUVIETNAM",
         ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",

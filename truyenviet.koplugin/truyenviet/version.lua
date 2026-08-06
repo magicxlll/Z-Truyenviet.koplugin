@@ -1,17 +1,6 @@
--- Internal Dev Tracking: BUILD_NUMBER = "1359"
-return "3.8.8"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+local Version = {
+    VERSION = "3.9.0",
+    COMMIT = "BUILD-1361",
+    AUTHOR = "Zit"
+}
+return Version
