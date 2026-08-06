@@ -25,8 +25,8 @@ local function apiGet(endpoint)
 end
 
 function Source:search(query)
-    local encoded = ko_util.urlEncode(query):gsub("%%20", "+")
-    local parsed, err = apiGet("/stories?page=1&limit=30&search=" .. encoded)
+    local encoded = Util.urlEncode(query):gsub("%%20", "+")
+    local parsed, err = apiGet("/stories/search?q=" .. encoded)
     if not parsed or not parsed.data then return nil, err end
 
     local stories = {}

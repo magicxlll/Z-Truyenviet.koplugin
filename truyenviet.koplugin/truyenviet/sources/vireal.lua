@@ -60,57 +60,57 @@ local function cleanVirealContent(raw_chunk)
     return Util.sanitizeContentHtml(chunk)
 end
 
+local function apiQuery(query, variables)
+    local payload = {
+        operationName = query:match("query%s+([a-zA-Z0-9_]+)"),
+        query = query,
+        variables = variables or {}
+    }
+    local res, err = Http:post("https://api.vireal.vn/graphql", ko_util.jsonEncode(payload), {
+        ["Content-Type"] = "application/json",
+        ["x-api-key"] = "TOIYEUVIETNAM",
+        ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    })
+    if not res then return nil, err end
+    local parsed = Util.parseJson(res)
+    if not parsed or parsed.errors then
+        return nil, parsed and parsed.errors[1] and parsed.errors[1].message or "Lỗi GraphQL Vireal"
+    end
+    return parsed.data
+end
+
 function Source:search(query)
-    local html, err
+    local q = [[
+        query GetStories($page: Int, $limit: Int, $filters: StoryFilters) {
+            getStories(page: $page, limit: $limit, filters: $filters) {
+                data { name slug thumbnail }
+            }
+        }
+    ]]
+    local filters = { type = 2 }
     if query and query ~= "" then
-        local encoded = ko_util.urlEncode(query):gsub("%%20", "+")
-        local url = self.base_url .. "/search?q=" .. encoded
-        html, err = Http:get(url, {
-            ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        })
+        filters.search = query
     end
 
-    if not html or #html < 500 then
-        html, err = Http:get(self.base_url, {
-            ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        })
-    end
-    if not html then return nil, err end
+    local data, err = apiQuery(q, {
+        page = 1,
+        limit = 30,
+        filters = filters
+    })
+    if not data or not data.getStories then return nil, err end
 
-    html = normalizeHtml(html)
     local stories = {}
-    local seen = {}
-
-    -- Match title & slug directly from Next.js RSC state
-    for title, slug in html:gmatch('"name"%s*:%s*"([^"]+)"[^{}]*"slug"%s*:%s*"([%w%-]+)"') do
-        if not seen[slug] and #slug > 3 and not slug:find("chuong") and not slug:find("chapter") then
-            seen[slug] = true
+    for _, item in ipairs(data.getStories.data or {}) do
+        if item.slug and #item.slug > 3 then
             table.insert(stories, {
                 source_id = self.id,
-                title = Util.decodeHtml(Util.stripTags(title)),
-                url = self.base_url .. "/story/" .. slug,
-                cover_url = nil,
+                title = item.name or "Chưa có tiêu đề",
+                url = self.base_url .. "/story/" .. item.slug,
+                cover_url = item.thumbnail,
                 kind = "text",
             })
         end
     end
-
-    -- Fallback matching by URL path
-    if #stories == 0 then
-        for slug in html:gmatch('/story/([%w%-]+)') do
-            if not seen[slug] and #slug > 3 then
-                seen[slug] = true
-                table.insert(stories, {
-                    source_id = self.id,
-                    title = "Vireal · " .. slug,
-                    url = self.base_url .. "/story/" .. slug,
-                    cover_url = nil,
-                    kind = "text",
-                })
-            end
-        end
-    end
-
     return stories
 end
 
@@ -167,13 +167,13 @@ function Source:getStoryPage(story, page)
     local chapters = {}
     local seen = {}
 
-    for slug in html:gmatch('/story/[%w%-]+/([%w%-]+)') do
-        if not seen[slug] and (slug:find("chuong") or slug:find("chapter") or slug:match("^%d+$")) then
+    for title, slug in html:gmatch('\\"name\\":\\"([^\\"]+)\\",\\"slug\\":\\"([%w%-]+)\\"') do
+        if not seen[slug] and slug:match("^chuong") then
             seen[slug] = true
             local num = tonumber(slug:match("%d+")) or #chapters + 1
             table.insert(chapters, {
-                title = "Chương " .. num,
-                url = story_url .. "/" .. slug,
+                title = Util.decodeHtml(Util.stripTags(title)),
+                url = self.base_url .. "/story/" .. story.url:match("/story/([^/]+)") .. "/" .. slug,
                 number = num,
                 order = num,
                 source_id = self.id,
