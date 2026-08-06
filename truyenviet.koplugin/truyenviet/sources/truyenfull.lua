@@ -48,18 +48,15 @@ function Source:parseSearch(html)
     end
 
     if #stories == 0 then
-        local error_msg = "Lỗi Parse 0 truyện, HTML size: " .. tostring(#html)
         if html:find("Cloudflare", 1, true) or html:find("Just a moment", 1, true) then
-            error_msg = error_msg .. " - Bị Cloudflare block"
-        elseif html:find("truyen%-title") or html:find("itemprop") then
-            error_msg = error_msg .. " - Có tag nhưng parse lỗi"
+            local error_msg = "Lỗi Parse 0 truyện, HTML size: " .. tostring(#html) .. " - Bị Cloudflare block"
+            table.insert(stories, {
+                source_id = self.id,
+                title = error_msg,
+                url = self.base_url,
+                kind = self.kind,
+            })
         end
-        table.insert(stories, {
-            source_id = self.id,
-            title = error_msg,
-            url = self.base_url,
-            kind = self.kind,
-        })
     end
 
     return Util.uniqueBy(stories, "url")

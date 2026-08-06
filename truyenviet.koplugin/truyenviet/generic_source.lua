@@ -122,16 +122,14 @@ function GenericSource.create(schema)
         end
 
         if #stories == 0 then
-            local error_msg = "Lỗi Parse 0 truyện từ nguồn " .. self.name
             if html:find("Cloudflare", 1, true) or html:find("Just a moment", 1, true) then
-                error_msg = error_msg .. " - Bị Cloudflare block"
+                table.insert(stories, {
+                    source_id = self.id,
+                    title = "Lỗi Parse 0 truyện từ nguồn " .. self.name .. " - Bị Cloudflare block",
+                    url = self.base_url,
+                    kind = self.kind,
+                })
             end
-            table.insert(stories, {
-                source_id = self.id,
-                title = error_msg,
-                url = self.base_url,
-                kind = self.kind,
-            })
         end
 
         return Util.uniqueBy(stories, "url")

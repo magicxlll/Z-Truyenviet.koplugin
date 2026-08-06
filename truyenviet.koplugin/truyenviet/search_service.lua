@@ -16,9 +16,18 @@ function SearchService:search(query, sources)
         if type(source.search) == "function" then
             local ok, stories, err = pcall(source.search, source, query)
             
+            -- Đếm số lượng truyện thực tế (loại trừ các thông báo lỗi Parse giả)
+            local valid_count = 0
+            if type(stories) == "table" then
+                for _, s in ipairs(stories) do
+                    if type(s) == "table" and type(s.title) == "string" and not s.title:find("^Lỗi Parse") then
+                        valid_count = valid_count + 1
+                    end
+                end
+            end
+
             -- Nếu tìm theo từ có dấu không ra kết quả, thử lại với từ không dấu
-            if ok and type(stories) == "table" and #stories == 0
-                    and unaccented_query ~= query then
+            if ok and valid_count == 0 and unaccented_query ~= query then
                 local ok2, stories2, err2 = pcall(source.search, source, unaccented_query)
                 if ok2 and type(stories2) == "table" and #stories2 > 0 then
                     ok, stories, err = ok2, stories2, err2
@@ -49,7 +58,8 @@ function SearchService:search(query, sources)
                             and type(story.url) == "string"
                             and story.url ~= ""
                             and type(story.title) == "string"
-                            and story.title ~= "" then
+                            and story.title ~= ""
+                            and not story.title:find("^Lỗi Parse") then
                         local key = story.source_id .. "|" .. story.url
                         if not seen[key] then
                             seen[key] = true

@@ -309,8 +309,9 @@ function Source:parseSearch(html, query)
     for _, config in ipairs(STORIES) do
         local matches = true
         if query_lower ~= "" then
-            local title_lower = config.title:lower()
-            matches = title_lower:find(query_lower, 1, true) or query_lower:find("con đường bá chủ", 1, true) or query_lower:find("bá chủ", 1, true) or query_lower:find("ngoại truyện", 1, true)
+            local unaccented_query = Util.removeAccents(query_lower)
+            local title_lower = Util.removeAccents(config.title:lower())
+            matches = title_lower:find(unaccented_query, 1, true) or unaccented_query:find("con duong ba chu", 1, true) or unaccented_query:find("ba chu", 1, true) or unaccented_query:find("ngoai truyen", 1, true)
         end
 
         if matches then
