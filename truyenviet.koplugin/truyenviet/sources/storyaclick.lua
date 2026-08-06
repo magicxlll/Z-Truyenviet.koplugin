@@ -232,4 +232,64 @@ function Source:getChapter(chapter)
     }
 end
 
+function Source:getHot(page)
+    page = page or 1
+    local parsed, err = apiGet("/stories/hot?page=" .. page .. "&limit=20")
+    if not parsed or not parsed.data then return nil, err end
+
+    local stories = {}
+    for _, item in ipairs(parsed.data) do
+        local cover = item.coverUrl
+        if cover and cover:sub(1, 1) == "/" then
+            cover = self.base_url .. cover
+        end
+        table.insert(stories, {
+            source_id = self.id,
+            title = item.title or "Chưa có tiêu đề",
+            url = self.base_url .. "/truyen/" .. item.slug,
+            cover_url = cover,
+            kind = "text",
+        })
+    end
+
+    local meta = parsed.meta or {}
+    return {
+        stories = stories,
+        genres = self:getGenresList() or {},
+        page = page,
+        total_pages = meta.totalPages or 1,
+        title = "Truyện Hot",
+    }
+end
+
+function Source:getLatest(page)
+    page = page or 1
+    local parsed, err = apiGet("/stories?page=" .. page .. "&limit=20")
+    if not parsed or not parsed.data then return nil, err end
+
+    local stories = {}
+    for _, item in ipairs(parsed.data) do
+        local cover = item.coverUrl
+        if cover and cover:sub(1, 1) == "/" then
+            cover = self.base_url .. cover
+        end
+        table.insert(stories, {
+            source_id = self.id,
+            title = item.title or "Chưa có tiêu đề",
+            url = self.base_url .. "/truyen/" .. item.slug,
+            cover_url = cover,
+            kind = "text",
+        })
+    end
+
+    local meta = parsed.meta or {}
+    return {
+        stories = stories,
+        genres = self:getGenresList() or {},
+        page = page,
+        total_pages = meta.totalPages or 1,
+        title = "Truyện Mới Nhất",
+    }
+end
+
 return Source

@@ -196,6 +196,16 @@ function Source:getChapter(chapter)
         kind = "text",
         -- no previous/next url easy extraction without API, but KOReader handles it mostly via chapter list
     }
+function Source:getHot(page)
+    local res = self:_getList("/truyen-hot", page or 1)
+    res.title = "Truyện Hot"
+    return res
+end
+
+function Source:getLatest(page)
+    local res = self:_getList("/truyen-moi-nhat", page or 1)
+    res.title = "Truyện Mới Nhất"
+    return res
 end
 
 return Source
