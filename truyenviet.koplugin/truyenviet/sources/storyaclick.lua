@@ -1,6 +1,5 @@
 local Http = require("truyenviet/http_client")
 local Util = require("truyenviet/helpers")
-local ko_util = require("util")
 
 -- Storya.click — Trang đọc truyện Next.js Client-rendered với REST API JSON
 local Source = {
@@ -25,6 +24,7 @@ local function apiGet(endpoint)
 end
 
 function Source:search(query)
+    -- Storya search api endpoint
     local encoded = Util.urlEncode(query):gsub("%%20", "+")
     local parsed, err = apiGet("/stories/search?q=" .. encoded)
     if not parsed or not parsed.data then return nil, err end
@@ -153,18 +153,22 @@ end
 
 function Source:getStoryPage(story, page)
     page = page or 1
-    local slug = story.url:match("/truyen/([^/?]+)") or story.url
-    local parsed, err = apiGet("/chapters/story/" .. slug .. "?page=" .. page .. "&limit=50&minimal=true")
+    local story_slug = story.url:match("/truyen/([^/?]+)") or story.url
+    -- Tối ưu: Lấy list chapters qua API với limit lớn (100)
+    local parsed, err = apiGet("/chapters/story/" .. story_slug .. "?page=" .. page .. "&limit=100&minimal=true")
     if not parsed or not parsed.data then return nil, err end
 
     local chapters = {}
     for _, item in ipairs(parsed.data) do
         local chap_order = item.order or 1
+        local chap_slug = item.slug or ("chuong-" .. chap_order)
         table.insert(chapters, {
             title = item.title or ("Chương " .. chap_order),
-            url = self.base_url .. "/truyen/" .. slug .. "?chap=" .. chap_order,
+            -- Tối ưu: Lưu trữ trực tiếp chap_slug vào URL để getChapter gọi API dễ dàng
+            url = self.base_url .. "/truyen/" .. story_slug .. "/" .. chap_slug,
             order = chap_order,
-            slug = slug,
+            slug = story_slug,
+            chap_slug = chap_slug,
             source_id = self.id,
             story_url = story.url,
             kind = "text",
@@ -172,7 +176,9 @@ function Source:getStoryPage(story, page)
     end
 
     local meta = parsed.meta or {}
-    story.details = self:getStoryDetails(story)
+    if page == 1 then
+        story.details = self:getStoryDetails(story)
+    end
 
     return {
         story = story,
@@ -183,30 +189,34 @@ function Source:getStoryPage(story, page)
 end
 
 function Source:getChapter(chapter)
-    local slug = chapter.slug or chapter.url:match("/truyen/([^/?]+)")
-    local num = chapter.order or tonumber(chapter.url:match("chap=(%d+)")) or 1
+    local story_slug = chapter.slug
+    local chap_slug = chapter.chap_slug
+    
+    if not story_slug or not chap_slug then
+        story_slug, chap_slug = chapter.url:match("/truyen/([^/]+)/([^/?]+)")
+    end
 
-    local parsed, err = apiGet("/chapters/story/" .. slug .. "?page=" .. num .. "&limit=1&minimal=false")
-    if not parsed or not parsed.data or #parsed.data == 0 then
+    if not story_slug or not chap_slug then
+        return nil, "Không nhận diện được slug chương Storya"
+    end
+
+    -- Tối ưu: Gọi trực tiếp API nội dung chương theo cấu trúc /chapters/{story}/{chap}
+    local parsed, err = apiGet("/chapters/" .. story_slug .. "/" .. chap_slug)
+    if not parsed or not parsed.data then
         return nil, err or "Không tìm thấy nội dung chương"
     end
 
-    local item = parsed.data[1]
-    local raw_content = item.content or item.rawContent or item.rewrittenContent or ""
+    local item = parsed.data
+    local raw_content = item.rewrittenContent or item.content or item.rawContent or ""
     local content = ""
 
     if raw_content ~= "" then
         if raw_content:find("<p>") then
             content = raw_content
         else
-            local paragraphs = {}
-            for line in raw_content:gmatch("[^\r\n]+") do
-                line = Util.trim(line)
-                if #line > 0 then
-                    table.insert(paragraphs, "<p>" .. Util.escapeHtml(line) .. "</p>")
-                end
-            end
-            content = table.concat(paragraphs, "\n")
+            -- Tối ưu: Thay thế xuống dòng thành thẻ HTML <br>
+            local formatted = raw_content:gsub("\r\n", "\n"):gsub("\n\n", "<br><br>"):gsub("\n", "<br>")
+            content = "<div>" .. formatted .. "</div>"
         end
     end
 
@@ -214,14 +224,9 @@ function Source:getChapter(chapter)
         return nil, "Nội dung chương rỗng"
     end
 
-    local meta = parsed.meta or {}
-    local total_chaps = meta.total or 1000
-
     return {
         title = item.title or chapter.title,
         content = content,
-        previous_url = num > 1 and (self.base_url .. "/truyen/" .. slug .. "?chap=" .. (num - 1)) or nil,
-        next_url = num < total_chaps and (self.base_url .. "/truyen/" .. slug .. "?chap=" .. (num + 1)) or nil,
         url = chapter.url,
         kind = "text",
     }

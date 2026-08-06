@@ -1,7 +1,6 @@
 local Http = require("truyenviet/http_client")
 local Util = require("truyenviet/helpers")
 local json = require("json")
-local Debug = require("truyenviet/debugger")
 
 local Source = {
     id = "blhvip",
@@ -32,7 +31,6 @@ function Source:parseSearch(html)
 end
 
 function Source:search(keyword, page)
-    -- page is mostly 1 for search because it's a simple search API
     local url = "https://api.blhvip.vn/v1/search?q=" .. Util.urlEncode(keyword)
     local content, err = Http:get(url)
     if not content then return nil, err end
@@ -67,54 +65,46 @@ function Source:_getList(path, page)
     if not content then return nil, err end
     
     local stories = self:parseList(content)
-    local next_page = nil
+    local total_pages = page
     if content:find('href="[^"]+%?page=' .. (page + 1) .. '"') then
-        next_page = page + 1
-    else
-        next_page = page
+        total_pages = page + 1
     end
-    return stories, page, next_page
-end
-
-function Source:getHot(page)
-    return self:_getList("/truyen-hot", page)
-end
-
-function Source:getLatest(page)
-    return self:_getList("/truyen-moi-nhat", page)
-end
-
-function Source:getCompleted(page)
-    return self:_getList("/truyen-hoan-thanh", page)
-end
-
-function Source:getFavorites(page)
-    return self:_getList("/truyen-yeu-thich", page)
-end
-
-function Source:getTrending(page)
-    return self:_getList("/truyen-thinh-hanh-trong-tuan", page)
-end
-
-function Source:getGenres()
+    
     return {
-        { name = "Truyện Hot", getList = function(p) return self:getHot(p) end },
-        { name = "Truyện Mới Nhất", getList = function(p) return self:getLatest(p) end },
-        { name = "Truyện Hoàn Thành", getList = function(p) return self:getCompleted(p) end },
-        { name = "Yêu Thích Tháng", getList = function(p) return self:getFavorites(p) end },
-        { name = "Thịnh Hành Tuần", getList = function(p) return self:getTrending(p) end },
+        stories = stories,
+        page = page,
+        total_pages = total_pages,
+        genres = self:getGenresList() or {}
     }
 end
 
-function Source:getDetails(url)
-    local content, err = Http:get(url)
+function Source:getGenresList()
+    return {
+        { name = "Truyện Hot", slug = "truyen-hot", url = "/truyen-hot" },
+        { name = "Truyện Mới Nhất", slug = "truyen-moi-nhat", url = "/truyen-moi-nhat" },
+        { name = "Truyện Hoàn Thành", slug = "truyen-hoan-thanh", url = "/truyen-hoan-thanh" },
+        { name = "Yêu Thích Tháng", slug = "truyen-yeu-thich", url = "/truyen-yeu-thich" },
+        { name = "Thịnh Hành Tuần", slug = "truyen-thinh-hanh-trong-tuan", url = "/truyen-thinh-hanh-trong-tuan" },
+    }
+end
+
+function Source:getCompleted(page)
+    local res = self:_getList("/truyen-hoan-thanh", page or 1)
+    res.title = "Truyện Hoàn Thành"
+    return res
+end
+
+function Source:getGenre(genre, page)
+    local url_path = type(genre) == "table" and genre.url or ("/" .. genre)
+    local res = self:_getList(url_path, page or 1)
+    res.title = type(genre) == "table" and genre.name or "Danh sách"
+    return res
+end
+
+function Source:getStoryDetails(story)
+    local content, err = Http:get(story.url)
     if not content then return nil, err end
 
-    local title = content:match('<h1[^>]*>([^<]*)</h1>')
-    if title then 
-        title = Util.stripTags(title):gsub("\n", ""):gsub("^%s+", ""):gsub("%s+$", "") 
-    end
-    
     local author = content:match('<a[^>]+href="/tac%-gia/[^"]*"[^>]*>([^<]*)</a>')
     if author then 
         author = Util.stripTags(author):gsub("\n", "") 
@@ -125,60 +115,62 @@ function Source:getDetails(url)
         description = Util.stripTags(description) 
     end
 
-    local cover_url = content:match('<img[^>]+src="([^"]+)"[^>]+alt="' .. (title or "") .. '"')
-    if not cover_url then
-        cover_url = content:match('<div class="img%-story[^>]*>%s*<img[^>]+src="([^"]+)"')
-    end
-    if cover_url then cover_url = Util.absoluteUrl(self.base_url, cover_url) end
-
+    local status = content:match('Đã hoàn thành') and "Hoàn thành" or "Đang ra"
+    
     return {
-        source_id = self.id,
-        url = url,
-        title = title or "Unknown",
-        author = author or "Unknown",
+        author = author or "Khuyết Danh",
         description = description or "",
-        cover_url = cover_url,
-        kind = self.kind,
-        status = content:match('Đã hoàn thành') and "Completed" or "Ongoing",
+        status = status,
+        genres = {},
     }
 end
 
-function Source:getChapters(url)
-    local story_slug = url:match("/truyen/([^/]+)")
+function Source:getStoryPage(story, page)
+    page = page or 1
+    local story_slug = story.url:match("/truyen/([^/?]+)")
     if not story_slug then return nil, "Invalid story URL" end
     
-    local page = 1
-    local chapters = {}
+    local api_url = "https://api.blhvip.vn/v1/story/" .. story_slug .. "/chapter_list?page=" .. page .. "&new=0"
+    local content, err = Http:get(api_url)
+    if not content then return nil, err end
     
-    while true do
-        local api_url = "https://api.blhvip.vn/v1/story/" .. story_slug .. "/chapter_list?page=" .. page .. "&new=0"
-        local content, err = Http:get(api_url)
-        if not content then break end
-        
-        local ok, parsed = pcall(json.decode, content)
-        if not ok or type(parsed) ~= "table" or not parsed.data or #parsed.data == 0 then 
-            break 
-        end
-        
-        for _, item in ipairs(parsed.data) do
-            if item.name and item.url then
-                table.insert(chapters, {
-                    title = item.name,
-                    url = self.base_url .. item.url,
-                })
-            end
-        end
-        
-        local total_page = parsed.total_page or 1
-        if page >= total_page then break end
-        page = page + 1
+    local ok, parsed = pcall(json.decode, content)
+    if not ok or type(parsed) ~= "table" or not parsed.data then 
+        return nil, "Lỗi giải mã JSON"
     end
     
-    return chapters
+    local chapters = {}
+    for i, item in ipairs(parsed.data) do
+        if item.name and item.url then
+            local order = (page - 1) * 100 + i
+            table.insert(chapters, {
+                title = item.name,
+                url = self.base_url .. item.url,
+                order = order,
+                slug = story_slug,
+                kind = "text",
+                source_id = self.id,
+                story_url = story.url,
+            })
+        end
+    end
+    
+    local total_pages = parsed.total_page or 1
+    
+    if page == 1 then
+        story.details = self:getStoryDetails(story)
+    end
+    
+    return {
+        story = story,
+        chapters = chapters,
+        page = page,
+        total_pages = total_pages,
+    }
 end
 
-function Source:getChapterContent(url)
-    local content, err = Http:get(url)
+function Source:getChapter(chapter)
+    local content, err = Http:get(chapter.url)
     if not content then return nil, err end
     
     local chapter_content = content:match('<div id="chapter%-content"[^>]*>(.-)</div>%s*<div')
@@ -190,10 +182,19 @@ function Source:getChapterContent(url)
         return nil, "Không lấy được nội dung chương"
     end
     
+    -- Filter out scripts and ads
+    chapter_content = chapter_content:gsub("<script.-</script>", "")
+    chapter_content = chapter_content:gsub("<style.-</style>", "")
+    chapter_content = chapter_content:gsub("<iframe.-</iframe>", "")
+    chapter_content = chapter_content:gsub('<div[^>]+class="ads".-</div>', "")
+    
     local title = content:match('<h1[^>]*>([^<]+)</h1>')
     return {
-        title = title and Util.stripTags(title) or "Chương",
-        html = chapter_content
+        title = title and Util.stripTags(title) or chapter.title,
+        content = "<div>" .. chapter_content .. "</div>",
+        url = chapter.url,
+        kind = "text",
+        -- no previous/next url easy extraction without API, but KOReader handles it mostly via chapter list
     }
 end
 
