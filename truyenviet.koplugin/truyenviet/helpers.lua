@@ -11,9 +11,7 @@ function Util.urlEncode(str)
     end)
 end
 
-if not ko_util.urlEncode then
-    ko_util.urlEncode = Util.urlEncode
-end
+ko_util.urlEncode = Util.urlEncode
 
 local VIETNAMESE_ASCII = {
     ["à"] = "a", ["á"] = "a", ["ạ"] = "a", ["ả"] = "a", ["ã"] = "a",

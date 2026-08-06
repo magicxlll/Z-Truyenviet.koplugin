@@ -140,8 +140,8 @@ function GenericSource.create(schema)
     function source:search(query)
         local s_conf = self.schema.search or {}
         local path = s_conf.path or "/tim-kiem/?tukhoa={query}"
-        local encoded = ko_util.urlEncode(query):gsub("%%20", "+")
-        local url = self.base_url .. path:gsub("{query}", encoded)
+        local encoded = Util.urlEncode(query):gsub("%%20", "+")
+        local url = self.base_url .. path:gsub("{query}", function() return encoded end)
         
         local html, err = Http:get(url, self:getHeaders())
         if not html then
