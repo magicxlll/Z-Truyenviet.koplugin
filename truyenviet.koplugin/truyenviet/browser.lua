@@ -2453,6 +2453,7 @@ function Browser:openChapter(view, page_data, source, chapter, on_return_callbac
     local chapter_sort = page_data.chapter_sort
         or ChapterOrder.defaultMode(source)
     local next_chapter
+    local prev_chapter
     for i, c in ipairs(page_data.chapters) do
         local match = false
         if c.url == chapter.url then
@@ -2468,6 +2469,9 @@ function Browser:openChapter(view, page_data, source, chapter, on_return_callbac
         if match then
             next_chapter = page_data.chapters[
                 ChapterOrder.nextChapterIndex(chapter_sort, i)
+            ]
+            prev_chapter = page_data.chapters[
+                ChapterOrder.prevChapterIndex(chapter_sort, i)
             ]
             break
         end
@@ -2532,6 +2536,64 @@ function Browser:openChapter(view, page_data, source, chapter, on_return_callbac
             end)
         end
 
+    local function on_prev_chapter(called_from_reader)
+        local from_reader_flag = (called_from_reader ~= nil) and called_from_reader or from_reader
+        Debug.write("Browser:on_prev_chapter triggered, prev_chapter=" .. tostring(prev_chapter ~= nil) .. ", from_reader=" .. tostring(from_reader_flag))
+        UIManager:nextTick(function()
+            if prev_chapter then
+                    if from_reader_flag then
+                        Reader:returnToPlugin(function()
+                            self:openChapter(nil, page_data, source, prev_chapter, on_return_callback, false, from_reader_flag)
+                        end)
+                    else
+                        self:openChapter(nil, page_data, source, prev_chapter, on_return_callback, false, from_reader_flag)
+                    end
+                elseif page_data.total_pages > 1 then
+                    local prev_page = ChapterOrder.prevReadingPage(
+                        source,
+                        page_data.page,
+                        page_data.total_pages
+                    )
+                    if prev_page then
+                        local auto_open = ChapterOrder.prevPageAutoOpen(
+                            chapter_sort
+                        )
+                        if from_reader_flag then
+                            Reader:returnToPlugin(function()
+                                self:loadStoryPage(
+                                    story,
+                                    source,
+                                    prev_page,
+                                    on_return_callback,
+                                    auto_open,
+                                    from_reader_flag,
+                                    chapter_sort
+                                )
+                            end)
+                        else
+                            self:loadStoryPage(
+                                story,
+                                source,
+                                prev_page,
+                                on_return_callback,
+                                auto_open,
+                                from_reader_flag,
+                                chapter_sort
+                            )
+                        end
+                    else
+                        UIManager:show(InfoMessage:new{
+                        title = "Truyện Việt",
+                        text = "Đã tới chương đầu tiên ở thời điểm hiện tại." })
+                    end
+                else
+                    UIManager:show(InfoMessage:new{
+                    title = "Truyện Việt",
+                    text = "Đã tới chương đầu tiên ở thời điểm hiện tại." })
+                end
+            end)
+        end
+
     local existing = Builder:getExistingPath(source, story, chapter)
     if existing and not force then
         if view then UIManager:close(view) end
@@ -2539,7 +2601,7 @@ function Browser:openChapter(view, page_data, source, chapter, on_return_callbac
         Debug.write("Browser:existing found, calling Reader:show existing=" .. tostring(existing) .. ", from_reader=" .. tostring(from_reader))
         Reader:show(existing, function()
             self:showChapterList(page_data, source, on_return_callback)
-            end, on_next_chapter, from_reader)
+            end, on_next_chapter, from_reader, on_prev_chapter)
         return
     end
 
@@ -2598,7 +2660,7 @@ function Browser:openChapter(view, page_data, source, chapter, on_return_callbac
         Debug.write("Browser:build completed, path=" .. tostring(path) .. ", from_reader=" .. tostring(from_reader))
         Reader:show(path, function()
             self:showChapterList(page_data, source, on_return_callback)
-        end, on_next_chapter, from_reader)
+        end, on_next_chapter, from_reader, on_prev_chapter)
     end)
 end
 

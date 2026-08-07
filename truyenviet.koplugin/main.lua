@@ -83,6 +83,33 @@ function TruyenViet:init()
         reader = true,
         filemanager = true,
     })
+
+    Dispatcher:registerAction("truyenviet_next_chapter", {
+        category = "general",
+        event = "TruyenVietNextChapter",
+        title = "➡️ Truyện Việt: Chương tiếp",
+        general = true,
+        reader = true,
+        filemanager = true,
+    })
+
+    Dispatcher:registerAction("truyenviet_prev_chapter", {
+        category = "general",
+        event = "TruyenVietPrevChapter",
+        title = "⬅️ Truyện Việt: Chương trước",
+        general = true,
+        reader = true,
+        filemanager = true,
+    })
+
+    Dispatcher:registerAction("truyenviet_story_page", {
+        category = "general",
+        event = "TruyenVietStoryPage",
+        title = "🏠 Truyện Việt: Nguồn truyện",
+        general = true,
+        reader = true,
+        filemanager = true,
+    })
 end
 
 function TruyenViet:addToMainMenu(menu_items)
@@ -212,8 +239,33 @@ function TruyenViet:onTruyenVietDownloaded()
     Browser:showDownloadedManager(function() Browser:showRoot() end)
 end
 
+
+
+
+
+
+function TruyenViet:onTruyenVietNextChapter()
+    local Reader = require("truyenviet/reader")
+    if Reader.on_next_chapter_callback then
+        Reader.on_next_chapter_callback(true)
+    end
+end
+
+function TruyenViet:onTruyenVietPrevChapter()
+    local Reader = require("truyenviet/reader")
+    if Reader.on_prev_chapter_callback then
+        Reader.on_prev_chapter_callback(true)
+    end
+end
+
+function TruyenViet:onTruyenVietStoryPage()
+    local Reader = require("truyenviet/reader")
+    if Reader.active then
+        Reader:returnToPlugin(function()
+            Browser:showRoot()
+        end)
+    else
+        Browser:showRoot()
+    end
+end
 return TruyenViet
-
-
-
-

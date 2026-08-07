@@ -32,6 +32,10 @@ function ChapterOrder.nextChapterIndex(mode, current_index)
     return mode == "desc" and current_index - 1 or current_index + 1
 end
 
+function ChapterOrder.prevChapterIndex(mode, current_index)
+    return mode == "desc" and current_index + 1 or current_index - 1
+end
+
 function ChapterOrder.nextReadingPage(source, current_page, total_pages)
     local target = isDescendingSource(source)
         and current_page - 1
@@ -42,8 +46,22 @@ function ChapterOrder.nextReadingPage(source, current_page, total_pages)
     return target
 end
 
+function ChapterOrder.prevReadingPage(source, current_page, total_pages)
+    local target = isDescendingSource(source)
+        and current_page + 1
+        or current_page - 1
+    if target < 1 or target > total_pages then
+        return nil
+    end
+    return target
+end
+
 function ChapterOrder.nextPageAutoOpen(mode)
     return mode == "desc" and "last" or true
+end
+
+function ChapterOrder.prevPageAutoOpen(mode)
+    return mode == "desc" and true or "last"
 end
 
 function ChapterOrder.apply(page_data, source, mode)

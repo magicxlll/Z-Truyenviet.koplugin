@@ -10,11 +10,13 @@ local Reader = {
     returning = false,
     on_return_callback = nil,
     on_next_chapter_callback = nil,
+    on_prev_chapter_callback = nil,
 }
 
-function Reader:show(path, on_return_callback, on_next_chapter_callback, from_reader)
+function Reader:show(path, on_return_callback, on_next_chapter_callback, from_reader, on_prev_chapter_callback)
     self.on_return_callback = on_return_callback
     self.on_next_chapter_callback = on_next_chapter_callback
+    self.on_prev_chapter_callback = on_prev_chapter_callback
 
     Debug.write("Reader:show path=" .. tostring(path) .. ", from_reader=" .. tostring(from_reader))
 
@@ -99,7 +101,18 @@ function Reader:addToMainMenu(menu_items)
             sorting_hint = "main",
             callback = function()
                 if self.on_next_chapter_callback then
-                    self.on_next_chapter_callback()
+                    self.on_next_chapter_callback(false)
+                end
+            end,
+        }
+    end
+    if self.on_prev_chapter_callback then
+        menu_items.truyenviet_prev_chapter = {
+            text = "Chương trước",
+            sorting_hint = "main",
+            callback = function()
+                if self.on_prev_chapter_callback then
+                    self.on_prev_chapter_callback(false)
                 end
             end,
         }
