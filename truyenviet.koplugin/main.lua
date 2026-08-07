@@ -158,6 +158,30 @@ function TruyenViet:addToMainMenu(menu_items)
         end,
     }
 
+    menu_items.truyenviet_next_chapter = {
+        text = "➡️ Truyện Việt: Chương tiếp",
+        sorting_hint = "tools",
+        callback = function()
+            self:onTruyenVietNextChapter()
+        end,
+    }
+
+    menu_items.truyenviet_prev_chapter = {
+        text = "⬅️ Truyện Việt: Chương trước",
+        sorting_hint = "tools",
+        callback = function()
+            self:onTruyenVietPrevChapter()
+        end,
+    }
+
+    menu_items.truyenviet_story_page = {
+        text = "🏠 Truyện Việt: Nguồn truyện",
+        sorting_hint = "tools",
+        callback = function()
+            self:onTruyenVietStoryPage()
+        end,
+    }
+
     if self.ui and self.ui.name == "ReaderUI" then
         menu_items.truyenviet_reader_tools = {
             text = title_text,

@@ -173,7 +173,7 @@ function Source:getChapter(chapter)
     local content, err = Http:get(chapter.url)
     if not content then return nil, err end
     
-    local chapter_content = content:match('<div[^>]+class="[^"]*s%-content[^"]*"[^>]*>(.-)</div>')
+    local chapter_content = content:match('<div[^>]+class="[^"]*s%-content[^"]*"[^>]*>(.*)<div class="container chapter%-page%-apply"')
     if not chapter_content then
         chapter_content = content:match('<div id="chapter%-content"[^>]*>(.-)</div>')
     end

@@ -71,6 +71,13 @@ function Reader:initializeFromReaderUI(ui)
         
         listener.onCloseWidget = function()
             self.active = false
+            if not self.returning and self.on_return_callback then
+                local UIManager = require("ui/uimanager")
+                local callback = self.on_return_callback
+                self.on_return_callback = nil
+                -- Use nextTick to ensure the reader is fully closed before showing the browser
+                UIManager:nextTick(callback)
+            end
         end
 
         listener.onEndOfBook = function()
