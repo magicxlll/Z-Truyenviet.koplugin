@@ -1,7 +1,6 @@
 local Http = require("truyenviet/http_client")
 local Util = require("truyenviet/helpers")
 local json = require("json")
-local lfs = require("lfs")
 
 local Source = {
     id = "blhvip",
@@ -11,16 +10,17 @@ local Source = {
 }
 
 local function getCookie()
-    local path = lfs.currentdir() .. "/truyenviet_blhvip_cookie.txt"
-    local f = io.open(path, "r")
-    if not f then
-        path = lfs.currentdir() .. "/settings/truyenviet_blhvip_cookie.txt"
-        f = io.open(path, "r")
-    end
-    if f then
-        local cookie = f:read("*all")
-        f:close()
-        return cookie:gsub("[\r\n]", "")
+    local paths = {
+        "./truyenviet_blhvip_cookie.txt",
+        "./settings/truyenviet_blhvip_cookie.txt"
+    }
+    for _, path in ipairs(paths) do
+        local f = io.open(path, "r")
+        if f then
+            local cookie = f:read("*all")
+            f:close()
+            return cookie:gsub("[\r\n]", "")
+        end
     end
     -- Fallback to the cookie provided by the user for VIP access
     return "XSRF-TOKEN=eyJpdiI6ImZWYmUrNmRqdW5nbEdqSFFwNkt5L1E9PSIsInZhbHVlIjoiNmZGN21FNmZzc0ZuWndKZTNxMWdaeStPZ0VPalM1bEN6STU2M0NoazVBc041TlVNRng1Y1ZwYUpSUFJ6bkgyRHJRbGhRUHJIYUdxaktzZUZsZkJVSXN6cVJsSlNEZ2RkQ1RIWVNFaUlpL3Z4dS9ZYTd2dVhNMFQvT3FxdElUZXMiLCJtYWMiOiIzYjc1NzAyOTVhZjViMDZhNzVjNDA3Mzg3ODg3ODU1YmIyYzI1ZjM0MzY2ODFhOWNkOTkxMzhjNjYwZjFjOTUzIiwidGFnIjoiIn0%3D"
