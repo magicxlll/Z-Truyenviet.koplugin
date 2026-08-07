@@ -1,6 +1,7 @@
 local Http = require("truyenviet/http_client")
 local Util = require("truyenviet/helpers")
 local json = require("json")
+local lfs = require("lfs")
 
 local Source = {
     id = "blhvip",
@@ -8,6 +9,21 @@ local Source = {
     kind = "text",
     base_url = "https://blhvip.vn",
 }
+
+local function getCookie()
+    local path = lfs.currentdir() .. "/truyenviet_blhvip_cookie.txt"
+    local f = io.open(path, "r")
+    if not f then
+        path = lfs.currentdir() .. "/settings/truyenviet_blhvip_cookie.txt"
+        f = io.open(path, "r")
+    end
+    if f then
+        local cookie = f:read("*all")
+        f:close()
+        return cookie:gsub("[\r\n]", "")
+    end
+    return nil
+end
 
 function Source:parseSearch(html)
     local ok, parsed = pcall(json.decode, html)
@@ -32,7 +48,10 @@ end
 
 function Source:search(keyword, page)
     local url = "https://api.blhvip.vn/v1/search?q=" .. Util.urlEncode(keyword)
-    local content, err = Http:get(url)
+    local headers = {}
+    local cookie = getCookie()
+    if cookie and cookie ~= "" then headers["Cookie"] = cookie end
+    local content, err = Http:get(url, headers)
     if not content then return nil, err end
     
     local stories = self:parseSearch(content)
@@ -61,7 +80,10 @@ function Source:_getList(path, page)
     if page and page > 1 then
         url = url .. "?page=" .. page
     end
-    local content, err = Http:get(url)
+    local headers = {}
+    local cookie = getCookie()
+    if cookie and cookie ~= "" then headers["Cookie"] = cookie end
+    local content, err = Http:get(url, headers)
     if not content then return nil, err end
     
     local stories = self:parseList(content)
@@ -102,7 +124,10 @@ function Source:getGenre(genre, page)
 end
 
 function Source:getStoryDetails(story)
-    local content, err = Http:get(story.url)
+    local headers = {}
+    local cookie = getCookie()
+    if cookie and cookie ~= "" then headers["Cookie"] = cookie end
+    local content, err = Http:get(story.url, headers)
     if not content then return nil, err end
 
     local author = content:match('<a[^>]+href="/tac%-gia/[^"]*"[^>]*>([^<]*)</a>')
@@ -131,7 +156,10 @@ function Source:getStoryPage(story, page)
     if not story_slug then return nil, "Invalid story URL" end
     
     local api_url = "https://api.blhvip.vn/v1/story/" .. story_slug .. "/chapter_list?page=" .. page .. "&new=0"
-    local content, err = Http:get(api_url)
+    local headers = {}
+    local cookie = getCookie()
+    if cookie and cookie ~= "" then headers["Cookie"] = cookie end
+    local content, err = Http:get(api_url, headers)
     if not content then return nil, err end
     
     local ok, parsed = pcall(json.decode, content)
@@ -170,8 +198,15 @@ function Source:getStoryPage(story, page)
 end
 
 function Source:getChapter(chapter)
-    local content, err = Http:get(chapter.url)
+    local headers = {}
+    local cookie = getCookie()
+    if cookie and cookie ~= "" then headers["Cookie"] = cookie end
+    local content, err = Http:get(chapter.url, headers)
     if not content then return nil, err end
+    
+    if content:find('class="[^"]*content%-lock[^"]*"') then
+        return nil, "Chương VIP bị khóa! Bạn cần Đăng nhập và mua Linh Thạch trên blhvip.vn.\n\n(Nếu đã có tài khoản, hãy copy nội dung Cookie và dán vào file truyenviet_blhvip_cookie.txt trong thư mục gốc của KOReader để đọc nhé!)"
+    end
     
     local chapter_content = content:match('<div[^>]+class="[^"]*s%-content[^"]*"[^>]*>(.*)<div class="container chapter%-page%-apply"')
     if not chapter_content then
@@ -194,7 +229,6 @@ function Source:getChapter(chapter)
         content = "<div>" .. chapter_content .. "</div>",
         url = chapter.url,
         kind = "text",
-        -- no previous/next url easy extraction without API, but KOReader handles it mostly via chapter list
     }
 end
 
