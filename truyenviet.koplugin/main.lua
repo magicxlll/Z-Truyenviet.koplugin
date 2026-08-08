@@ -39,6 +39,10 @@ function TruyenViet:init()
         end
     end)
 
+    -- Dispatcher actions are now registered in onDispatcherRegisterActions
+end
+
+function TruyenViet:onDispatcherRegisterActions()
     Dispatcher:registerAction("start_truyenviet", {
         category = "none",
         event = "StartTruyenViet",
