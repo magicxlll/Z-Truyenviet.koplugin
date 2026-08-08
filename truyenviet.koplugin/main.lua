@@ -36,10 +36,9 @@ function TruyenViet:init()
                     end,
                 })
             end
-        end
     end)
 
-    -- Dispatcher actions are now registered in onDispatcherRegisterActions
+    self:onDispatcherRegisterActions()
 end
 
 function TruyenViet:onDispatcherRegisterActions()
