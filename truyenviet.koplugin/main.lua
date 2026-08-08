@@ -40,7 +40,7 @@ function TruyenViet:init()
     end)
 
     Dispatcher:registerAction("start_truyenviet", {
-        category = "general",
+        category = "none",
         event = "StartTruyenViet",
         title = "🔥 Truyện Việt",
         general = true,
@@ -49,7 +49,7 @@ function TruyenViet:init()
     })
 
     Dispatcher:registerAction("truyenviet_chapter_list", {
-        category = "general",
+        category = "none",
         event = "TruyenVietBackToChapters",
         title = "📋 Truyện Việt: Danh sách chương",
         general = true,
@@ -58,7 +58,7 @@ function TruyenViet:init()
     })
 
     Dispatcher:registerAction("truyenviet_continue", {
-        category = "general",
+        category = "none",
         event = "TruyenVietContinue",
         title = "📖 Truyện Việt: Tiếp tục đọc",
         general = true,
@@ -67,7 +67,7 @@ function TruyenViet:init()
     })
 
     Dispatcher:registerAction("truyenviet_history", {
-        category = "general",
+        category = "none",
         event = "TruyenVietHistory",
         title = "📜 Truyện Việt: Lịch sử đọc",
         general = true,
@@ -76,7 +76,7 @@ function TruyenViet:init()
     })
 
     Dispatcher:registerAction("truyenviet_downloaded", {
-        category = "general",
+        category = "none",
         event = "TruyenVietDownloaded",
         title = "💾 Truyện Việt: Đã tải xuống",
         general = true,
@@ -85,7 +85,7 @@ function TruyenViet:init()
     })
 
     Dispatcher:registerAction("truyenviet_next_chapter", {
-        category = "general",
+        category = "none",
         event = "TruyenVietNextChapter",
         title = "➡️ Truyện Việt: Chương tiếp",
         general = true,
@@ -94,7 +94,7 @@ function TruyenViet:init()
     })
 
     Dispatcher:registerAction("truyenviet_prev_chapter", {
-        category = "general",
+        category = "none",
         event = "TruyenVietPrevChapter",
         title = "⬅️ Truyện Việt: Chương trước",
         general = true,
@@ -103,7 +103,7 @@ function TruyenViet:init()
     })
 
     Dispatcher:registerAction("truyenviet_story_page", {
-        category = "general",
+        category = "none",
         event = "TruyenVietStoryPage",
         title = "🏠 Truyện Việt: Nguồn truyện",
         general = true,
