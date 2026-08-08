@@ -50,6 +50,7 @@ function TruyenViet:onDispatcherRegisterActions()
         general = true,
         reader = true,
         filemanager = true,
+        plugin = true,
     })
 
     Dispatcher:registerAction("truyenviet_chapter_list", {
@@ -59,6 +60,7 @@ function TruyenViet:onDispatcherRegisterActions()
         general = true,
         reader = true,
         filemanager = true,
+        plugin = true,
     })
 
     Dispatcher:registerAction("truyenviet_continue", {
@@ -68,6 +70,7 @@ function TruyenViet:onDispatcherRegisterActions()
         general = true,
         reader = true,
         filemanager = true,
+        plugin = true,
     })
 
     Dispatcher:registerAction("truyenviet_history", {
@@ -77,6 +80,7 @@ function TruyenViet:onDispatcherRegisterActions()
         general = true,
         reader = true,
         filemanager = true,
+        plugin = true,
     })
 
     Dispatcher:registerAction("truyenviet_downloaded", {
@@ -86,6 +90,7 @@ function TruyenViet:onDispatcherRegisterActions()
         general = true,
         reader = true,
         filemanager = true,
+        plugin = true,
     })
 
     Dispatcher:registerAction("truyenviet_next_chapter", {
@@ -95,6 +100,7 @@ function TruyenViet:onDispatcherRegisterActions()
         general = true,
         reader = true,
         filemanager = true,
+        plugin = true,
     })
 
     Dispatcher:registerAction("truyenviet_prev_chapter", {
@@ -104,15 +110,17 @@ function TruyenViet:onDispatcherRegisterActions()
         general = true,
         reader = true,
         filemanager = true,
+        plugin = true,
     })
 
     Dispatcher:registerAction("truyenviet_story_page", {
         category = "none",
         event = "TruyenVietStoryPage",
-        title = "🏠 Truyện Việt: Nguồn truyện",
+        title = "🏠 Truyện Việt: Về nguồn",
         general = true,
         reader = true,
         filemanager = true,
+        plugin = true,
     })
 end
 

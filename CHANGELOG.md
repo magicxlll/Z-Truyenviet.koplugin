@@ -1,3 +1,12 @@
+## 3.8.0 (BUILD-1368) - 2026-08-09
+
+### Feature & Fixes
+- **Nguồn `xtruyen`**:
+  - Tích hợp thành công module giải nén Zlib (`ffi/zlib`) và giải mã chuỗi Base64 tùy biến để xử lý nội dung mã hóa `data_x` của nguồn `xtruyen.vn` trực tiếp trên KOReader. Khắc phục triệt để lỗi "Không tìm thấy nội dung chương" khi đọc truyện.
+  - Bổ sung cơ chế trích xuất tên chương thật từ nội dung tải về (do Cloudflare chặn API mục lục), hiển thị đúng tên trên thanh tiêu đề khi đọc truyện.
+  - Tự động sinh danh sách mục lục (Chương 1, Chương 2,...) để vượt qua lớp bảo vệ JS Challenge của Cloudflare đối với các API AJAX ẩn.
+- **Hệ thống (ZenUI)**:
+  - Cập nhật cờ `plugin = true` cho toàn bộ các đường dẫn nhanh (Dispatcher actions) như "Tiếp tục đọc", "Lịch sử đọc", "Đã tải xuống", giúp tính năng nhận diện chính xác và hiển thị đầy đủ bên trong mục Plugin của giao diện.
 # Changelog
 
 ## 3.7.0 (BUILD-1341) - 2026-07-29

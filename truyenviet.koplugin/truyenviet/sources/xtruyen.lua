@@ -189,21 +189,65 @@ end
 function Source:parseChapter(html, chapter)
     local chapter_title = html:match('<h1[^>]*class="[^"]*chapter%-title[^"]*"[^>]*>([%s%S]-)</h1>')
         or html:match('id="chapter%-heading"[^>]*>([%s%S]-)</h1>')
+        or html:match('<h2[^>]*>([%s%S]-)</h2>')
         
-    local start_at = html:find('class="reading%-content"') or html:find('class="text%-left"')
-    if not start_at then
-        return nil, "Không tìm thấy nội dung chương"
-    end
-    start_at = html:find(">", start_at, true)
+    local content = ""
+    local data_x = html:match('const%s+data_x%s*=%s*"([^"]+)"')
+    if data_x then
+        local s = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+        local c = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
+        local translated = ""
+        for i = 1, #data_x do
+            local char = data_x:sub(i, i)
+            local idx = c:find(char, 1, true)
+            if idx then
+                translated = translated .. s:sub(idx, idx)
+            else
+                translated = translated .. char
+            end
+        end
 
-    local end_at = html:find('</div>%s*<div class="chap%-bottom"', start_at)
-        or html:find('</div>%s*<div class="chapter%-content%-bottom"', start_at)
-        or html:find('</article>', start_at)
-    if not end_at then
-        return nil, "Không xác định được điểm kết thúc chương"
+        local b64_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+        translated = string.gsub(translated, '[^'..b64_chars..'=]', '')
+        local decoded_bytes = (translated:gsub('.', function(x)
+            if (x == '=') then return '' end
+            local r,f='',(b64_chars:find(x)-1)
+            for j=6,1,-1 do r=r..(f%2^j-f%2^(j-1)>0 and '1' or '0') end
+            return r;
+        end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
+            if (#x ~= 8) then return '' end
+            local cv=0
+            for j=1,8 do cv=cv+(x:sub(j,j)=='1' and 2^(8-j) or 0) end
+            return string.char(cv)
+        end))
+
+        local ok, zlib = pcall(require, "ffi/zlib")
+        if ok and zlib and zlib.zlib_uncompress then
+            local ok2, decomp = pcall(zlib.zlib_uncompress, decoded_bytes, 2 * 1024 * 1024)
+            if ok2 and decomp then
+                content = decomp
+            end
+        end
     end
 
-    local content = Util.sanitizeContentHtml(html:sub(start_at + 1, end_at - 1))
+    if content == "" then
+        local start_at = html:find('class="reading%-content"') or html:find('class="text%-left"')
+        if not start_at then
+            return nil, "Không tìm thấy nội dung chương"
+        end
+        start_at = html:find(">", start_at, true)
+    
+        local end_at = html:find('</div>%s*<div class="chap%-bottom"', start_at)
+            or html:find('</div>%s*<div class="chapter%-content%-bottom"', start_at)
+            or html:find('</article>', start_at)
+        if not end_at then
+            end_at = html:find('</div>%s*</div>%s*</div>', start_at) or #html
+        end
+    
+        content = html:sub(start_at + 1, end_at - 1)
+    end
+
+    content = Util.sanitizeContentHtml(content)
 
     return {
         title = chapter_title and Util.stripTags(chapter_title) or chapter.title,
