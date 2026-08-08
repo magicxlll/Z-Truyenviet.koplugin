@@ -24,6 +24,7 @@ local BUILTIN_SOURCES = {
     require("truyenviet/sources/blhvip"),
     require("truyenviet/sources/metruyenchuvn"),
     require("truyenviet/sources/conduongbachu"),
+    require("truyenviet/sources/xtruyen"),
 }
 
 local SOURCES = {}
