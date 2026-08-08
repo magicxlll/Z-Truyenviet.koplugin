@@ -116,96 +116,81 @@ function TruyenViet:onDispatcherRegisterActions()
 end
 
 function TruyenViet:addToMainMenu(menu_items)
-    local function openTruyenViet()
-        Browser:showRoot()
-    end
-
     local title_text = "🔥 Truyện Việt v" .. Version
 
-    -- Registered plugin entry for KOReader Plugin list & Zen UI PluginScan
+    local sub_items = {
+        {
+            text = "🔥 Mở Truyện Việt (Trang chủ)",
+            callback = function()
+                self:onStartTruyenViet()
+            end,
+        },
+        {
+            text = "📖 Tiếp tục đọc",
+            callback = function()
+                self:onTruyenVietContinue()
+            end,
+        },
+        {
+            text = "📋 Danh sách chương",
+            callback = function()
+                self:onTruyenVietBackToChapters()
+            end,
+        },
+        {
+            text = "➡️ Chương tiếp",
+            callback = function()
+                self:onTruyenVietNextChapter()
+            end,
+        },
+        {
+            text = "⬅️ Chương trước",
+            callback = function()
+                self:onTruyenVietPrevChapter()
+            end,
+        },
+        {
+            text = "🏠 Về nguồn truyện",
+            callback = function()
+                self:onTruyenVietStoryPage()
+            end,
+        },
+        {
+            text = "📜 Lịch sử đọc",
+            callback = function()
+                self:onTruyenVietHistory()
+            end,
+        },
+        {
+            text = "💾 Đã tải xuống",
+            callback = function()
+                self:onTruyenVietDownloaded()
+            end,
+        },
+    }
+
     menu_items.truyenviet = {
         text = title_text,
         sorting_hint = "tools",
-        callback = openTruyenViet,
-    }
-
-    menu_items.truyenviet_back_to_chapters = {
-        text = "📋 Truyện Việt: Danh sách chương",
-        sorting_hint = "tools",
-        callback = function()
-            self:onTruyenVietBackToChapters()
-        end,
-    }
-
-    menu_items.truyenviet_continue = {
-        text = "📖 Truyện Việt: Tiếp tục đọc",
-        sorting_hint = "tools",
-        callback = function()
-            self:onTruyenVietContinue()
-        end,
-    }
-
-    menu_items.truyenviet_history = {
-        text = "📜 Truyện Việt: Lịch sử đọc",
-        sorting_hint = "tools",
-        callback = function()
-            self:onTruyenVietHistory()
-        end,
-    }
-
-    menu_items.truyenviet_downloaded = {
-        text = "💾 Truyện Việt: Đã tải xuống",
-        sorting_hint = "tools",
-        callback = function()
-            self:onTruyenVietDownloaded()
-        end,
-    }
-
-    menu_items.truyenviet_next_chapter = {
-        text = "➡️ Truyện Việt: Chương tiếp",
-        sorting_hint = "tools",
-        callback = function()
-            self:onTruyenVietNextChapter()
-        end,
-    }
-
-    menu_items.truyenviet_prev_chapter = {
-        text = "⬅️ Truyện Việt: Chương trước",
-        sorting_hint = "tools",
-        callback = function()
-            self:onTruyenVietPrevChapter()
-        end,
-    }
-
-    menu_items.truyenviet_story_page = {
-        text = "🏠 Truyện Việt: Nguồn truyện",
-        sorting_hint = "tools",
-        callback = function()
-            self:onTruyenVietStoryPage()
-        end,
+        sub_item_table = sub_items,
     }
 
     if self.ui and self.ui.name == "ReaderUI" then
         menu_items.truyenviet_reader_tools = {
             text = title_text,
             sorting_hint = "tools",
-            callback = openTruyenViet,
+            sub_item_table = sub_items,
         }
     else
         menu_items.truyenviet_search = {
             text = title_text,
             sorting_hint = "search",
-            callback = openTruyenViet,
+            sub_item_table = sub_items,
         }
         menu_items.truyenviet_tools = {
             text = title_text,
             sorting_hint = "tools",
-            callback = openTruyenViet,
-        }
-        menu_items.truyenviet_main = {
-            text = title_text,
-            sorting_hint = "main",
-            callback = openTruyenViet,
+            sub_item_table = sub_items,
         }
     end
 end
