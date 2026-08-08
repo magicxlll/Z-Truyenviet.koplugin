@@ -36,6 +36,7 @@ function TruyenViet:init()
                     end,
                 })
             end
+        end
     end)
 
     self:onDispatcherRegisterActions()
