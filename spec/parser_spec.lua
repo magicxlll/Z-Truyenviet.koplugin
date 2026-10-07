@@ -40,6 +40,63 @@ package.preload["util"] = function()
     }
 end
 
+package.preload["truyenviet/debugger"] = function()
+    return { write = function() end }
+end
+
+package.preload["truyenviet/storage"] = function()
+    return {
+        getCustomBaseUrl = function() return nil end,
+    }
+end
+
+package.preload["datastorage"] = function()
+    return {}
+end
+
+if type(describe) ~= "function" then
+    function describe(desc, fn) fn() end
+    function it(desc, fn) fn() end
+    local real_assert = assert
+    local fake_assert = setmetatable({
+        are = {
+            equal = function(expected, actual)
+                if expected ~= actual then
+                    error(string.format("expected %s, got %s", tostring(expected), tostring(actual)))
+                end
+            end,
+            same = function(expected, actual)
+                if expected ~= actual then
+                    error("assertion failed: tables are not same")
+                end
+            end,
+        },
+        is_true = function(v)
+            if not v then error("expected true, got false") end
+        end,
+        is_false = function(v)
+            if v then error("expected false, got true") end
+        end,
+        is_truthy = function(v)
+            if not v then error("expected truthy, got falsy") end
+        end,
+        is_falsy = function(v)
+            if v then error("expected falsy, got truthy") end
+        end,
+        is_nil = function(v)
+            if v ~= nil then error("expected nil, got non-nil") end
+        end,
+        is_not_nil = function(v)
+            if v == nil then error("expected not nil, got nil") end
+        end,
+    }, {
+        __call = function(_, val, msg)
+            return real_assert(val, msg)
+        end
+    })
+    assert = fake_assert
+end
+
 local TruyenFull = require("truyenviet/sources/truyenfull")
 local TruyenQQ = require("truyenviet/sources/truyenqq")
 local DuaLeo = require("truyenviet/sources/dualeo")

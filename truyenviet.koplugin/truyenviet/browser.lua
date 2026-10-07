@@ -467,6 +467,16 @@ function Browser:showRoot()
             end,
         })
         table.insert(items, {
+            text = "☁️ Tải Ebook từ Google Drive",
+            callback = function()
+                closeAndRun(view, function()
+                    self:showGDriveDownloadDialog(function()
+                        self:showRoot()
+                    end)
+                end)
+            end,
+        })
+        table.insert(items, {
             text = "📦 Quản lý File Đã Tải & Gộp File",
             callback = function()
                 closeAndRun(view, function()
@@ -3639,7 +3649,11 @@ function Browser:openEbookFile(file_path, on_return_callback)
     if ext then ext = ext:lower() end
 
     -- Check if KOReader can open this format
-    local supported = { html = true, epub = true, pdf = true, mobi = true, txt = true, fb2 = true, cbz = true }
+    local supported = {
+        html = true, epub = true, pdf = true, mobi = true,
+        txt = true, fb2 = true, cbz = true, cbr = true,
+        azw3 = true, azw = true, prc = true, djvu = true,
+    }
     if ext and supported[ext] then
         local FileManager = require("apps/filemanager/filemanager")
         local ReaderUI = require("apps/reader/readerui")
@@ -3750,6 +3764,90 @@ function Browser:executeImport(url, mode, on_return)
             end
         end)
     end)
+end
+
+function Browser:showGDriveDownloadDialog(on_return)
+    local InputDialog = require("ui/widget/inputdialog")
+    local ButtonDialog = require("ui/widget/buttondialog")
+    local GDriveDownloader = require("truyenviet/gdrive_downloader")
+
+    local dialog
+    dialog = InputDialog:new{
+        title = "Tải Ebook từ Google Drive",
+        description = "Nhập liên kết công khai hoặc File ID Google Drive:\n(Hỗ trợ EPUB, CBZ, CBR, MOBI, PDF, AZW3, TXT...)",
+        input = "",
+        buttons = {
+            {
+                {
+                    text = "Hủy",
+                    callback = function()
+                        UIManager:close(dialog)
+                        if on_return then on_return() end
+                    end,
+                },
+                {
+                    text = "Tải về",
+                    is_default = true,
+                    callback = function()
+                        local input_text = dialog:getInputText()
+                        UIManager:close(dialog)
+                        if not input_text or Util.trim(input_text) == "" then
+                            showError("Vui lòng nhập liên kết hoặc File ID Google Drive!", on_return)
+                            return
+                        end
+
+                        local file_id = GDriveDownloader:extractFileId(input_text)
+                        if not file_id then
+                            showError("Không nhận diện được File ID Google Drive hợp lệ từ liên kết!", on_return)
+                            return
+                        end
+
+                        runOnline(function()
+                            local saved_path, err_msg
+                            withLoading("Đang kết nối & tải file từ Google Drive...\n(Quá trình có thể mất một vài giây)", function()
+                                saved_path, err_msg = GDriveDownloader:download(file_id)
+                            end)
+
+                            if saved_path then
+                                local filename = saved_path:match("([^/\\]+)$") or saved_path
+                                local success_dialog
+                                success_dialog = ButtonDialog:new{
+                                    title = "Tải thành công! ☁️",
+                                    description = "Đã tải file thành công về máy:\n" .. filename .. "\n\nĐường dẫn:\n" .. saved_path,
+                                    buttons = {
+                                        {
+                                            {
+                                                text = "📖 Mở đọc ngay",
+                                                is_default = true,
+                                                callback = function()
+                                                    UIManager:close(success_dialog)
+                                                    self:openEbookFile(saved_path, on_return)
+                                                end,
+                                            },
+                                            {
+                                                text = "Xong",
+                                                callback = function()
+                                                    UIManager:close(success_dialog)
+                                                    if on_return then on_return() end
+                                                end,
+                                            },
+                                        },
+                                    },
+                                }
+                                UIManager:show(success_dialog)
+                            else
+                                showError("Lỗi tải từ Google Drive:\n" .. tostring(err_msg or "Không rõ nguyên nhân"), on_return)
+                            end
+                        end)
+                    end,
+                },
+            },
+        },
+    }
+    UIManager:show(dialog)
+    if dialog.onShowKeyboard then
+        dialog:onShowKeyboard()
+    end
 end
 
 function Browser:showDirectImporterDialog(on_return)

@@ -1,6 +1,5 @@
 local Http = require("truyenviet/http_client")
 local Util = require("truyenviet/helpers")
-local json = require("json")
 
 local Source = {
     id = "blhvip",
@@ -27,8 +26,8 @@ local function getCookie()
 end
 
 function Source:parseSearch(html)
-    local ok, parsed = pcall(json.decode, html)
-    if not ok or not parsed or type(parsed) ~= "table" then
+    local parsed = Util.parseJson(html)
+    if not parsed or type(parsed) ~= "table" then
         return {}
     end
     
@@ -163,8 +162,8 @@ function Source:getStoryPage(story, page)
     local content, err = Http:get(api_url, headers)
     if not content then return nil, err end
     
-    local ok, parsed = pcall(json.decode, content)
-    if not ok or type(parsed) ~= "table" or not parsed.data then 
+    local parsed = Util.parseJson(content)
+    if not parsed or type(parsed) ~= "table" or not parsed.data then 
         return nil, "Lỗi giải mã JSON"
     end
     

@@ -390,6 +390,13 @@ function Storage:isEbookDownloaded(source, book, filename)
     return lfs.attributes(path, "mode") == "file", path
 end
 
+function Storage:getGDriveDir()
+    self:initialize()
+    local path = ffiutil.joinPath(self.root_dir, "gdrive")
+    ko_util.makePath(path)
+    return path
+end
+
 function Storage:isPrefetchEnabled()
     self:initialize()
     return self.settings:readSetting("prefetch_enabled", true) == true

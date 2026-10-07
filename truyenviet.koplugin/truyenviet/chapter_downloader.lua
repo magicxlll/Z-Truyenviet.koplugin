@@ -29,7 +29,9 @@ function ChapterDownloader:download(source, story, chapters)
     if source.kind == "comic" or type(source.getChapterAsync) ~= "function" then
         local total_chaps = chapters and #chapters or 0
         for i, chapter in ipairs(chapters or {}) do
-            coroutine.yield(string.format("Đang tải %d/%d chương...", i, total_chaps))
+            if coroutine.running() then
+                coroutine.yield(string.format("Đang tải %d/%d chương...", i, total_chaps))
+            end
             if Storage:isDownloaded(source, story, chapter) then
                 result.skipped = result.skipped + 1
             else

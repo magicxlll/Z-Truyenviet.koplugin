@@ -1,3 +1,19 @@
+## 3.10.0 (BUILD-1370) - 2026-10-07
+
+### Features & Improvements
+- **Tích hợp Tải Ebook từ Google Drive (Google Drive Integration)**:
+  - Bổ sung module `gdrive_downloader.lua` hỗ trợ tải ebook trực tiếp từ các liên kết chia sẻ công khai Google Drive (`/file/d/`, `?id=`, `/open?id=`, hoặc File ID trực tiếp).
+  - Tự động vượt qua màn hình cảnh báo quét virus của Google Drive đối với file dung lượng lớn qua trích xuất `confirm` token và quản lý phiên Cookie.
+  - Tự động nhận diện định dạng file thông qua Magic Bytes (`%PDF`, `PK\3\4` EPUB/CBZ, `Rar!` CBR, `BOOKMOBI`) và Content-Disposition header.
+  - Hỗ trợ toàn diện các định dạng: `.epub`, `.cbz`, `.cbr`, `.mobi`, `.pdf`, `.azw3`, `.txt`, `.fb2`, `.djvu`.
+  - Tích hợp giao diện `showGDriveDownloadDialog` trong `Browser` và Dispatcher action `truyenviet_gdrive_download`, hỗ trợ nút "Mở đọc ngay" sau khi tải hoàn tất.
+- **Sửa Lỗi & Tối Ưu Hệ Thống (Bug Fixes & Refactoring)**:
+  - Khắc phục lỗi `coroutine.yield across C-call boundary` trong `chapter_downloader.lua` khi chạy ngoài coroutine.
+  - Sửa lỗi sắp xếp mục lục chương trong `conduongbachu.lua` ưu tiên số chương thực tế trước khi so sánh chuỗi.
+  - Chuẩn hóa forward-compatibility với Lua 5.4+ (loại bỏ gán lại biến lặp `for`).
+  - Sửa toàn bộ 15 test suite kiểm thử đơn vị (`spec/`), bổ sung 20 assertions mới cho Google Drive downloader.
+  - Dọn dẹp mã nguồn thừa (`test_aeslua.lua`).
+
 ## 3.8.0 (BUILD-1368) - 2026-08-09
 
 ### Feature & Fixes

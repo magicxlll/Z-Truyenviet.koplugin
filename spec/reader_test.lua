@@ -37,6 +37,14 @@ package.preload["apps/filemanager/filemanager"] = function()
     }
 end
 
+package.preload["ui/widget/infomessage"] = function()
+    return {
+        new = function(_, def)
+            return def
+        end,
+    }
+end
+
 package.preload["ui/uimanager"] = function()
     return {
         broadcastEvent = function()
@@ -45,6 +53,26 @@ package.preload["ui/uimanager"] = function()
         nextTick = function(_, callback)
             callback()
         end,
+        scheduleIn = function(_, _, callback)
+            callback()
+        end,
+        show = function() end,
+        close = function() end,
+    }
+end
+
+package.preload["logger"] = function()
+    return {
+        dbg = function() end,
+        info = function() end,
+        warn = function() end,
+        err = function() end,
+    }
+end
+
+package.preload["truyenviet/debugger"] = function()
+    return {
+        write = function() end,
     }
 end
 
@@ -71,13 +99,12 @@ local function assertEqual(expected, actual, message)
     end
 end
 
+Reader.active = true
 ReaderUI.instance = {
-    switchDocument = function(_, path)
-        switched_path = path
-    end,
+    onClose = function() end,
 }
 Reader:show("chapter-2.html", function() end, function() end)
-assertEqual("chapter-2.html", switched_path, "Switches an active reader")
+assertEqual("chapter-2.html", show_reader_path, "Switches an active reader")
 assertEqual(true, Reader.active, "Keeps plugin reader session active")
 
 local normal_return_count = 0
@@ -98,6 +125,7 @@ assertEqual(1, normal_return_count, "Runs return callback once")
 assertEqual(false, Reader.active, "Ends reader session")
 
 ReaderUI.instance = nil
+broadcast_count = 0
 Reader:show("chapter-1.html", function() end, function() end)
 assertEqual(1, broadcast_count, "Prepares existing UI before opening reader")
 assertEqual("chapter-1.html", show_reader_path, "Opens a new reader")

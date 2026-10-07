@@ -204,10 +204,12 @@ local function curlFallback(method, url, request_headers)
             curl_cmd = curl_cmd .. string.format(' -X %s', method)
         end
         if not request_headers or not request_headers["User-Agent"] then
-            curl_cmd = curl_cmd .. string.format(' -H "User-Agent: %s"', HttpClient.user_agent)
+            curl_cmd = curl_cmd .. string.format(" -H 'User-Agent: %s'", tostring(HttpClient.user_agent):gsub("'", "'\\''"))
         end
         for k, v in pairs(request_headers or {}) do
-            curl_cmd = curl_cmd .. string.format(' -H "%s: %s"', k, tostring(v):gsub('"', '\\"'))
+            local clean_k = tostring(k):gsub("[\r\n:']", "")
+            local clean_v = tostring(v):gsub("[\r\n]", " "):gsub("'", "'\\''")
+            curl_cmd = curl_cmd .. string.format(" -H '%s: %s'", clean_k, clean_v)
         end
         curl_cmd = curl_cmd .. string.format(" '%s'", url:gsub("'", "'\\''"))
 

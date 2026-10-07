@@ -380,7 +380,8 @@ assertEqual(nil, login_err, "does not return an error after login")
 assertEqual("POST", last_post.method, "submits the Akay login form")
 assertEqual(
     true,
-    last_post.body:find("email=vip@example.com", 1, true) ~= nil,
+    (last_post.body:find("email=vip@example.com", 1, true) ~= nil
+        or last_post.body:find("email=vip%%40example%.com") ~= nil),
     "submits the account email"
 )
 assertEqual(

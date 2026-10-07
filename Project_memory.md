@@ -10,7 +10,7 @@ Tài liệu lưu trữ bộ nhớ dự án, tổng hợp kiến trúc, tình tr�
 | :--- | :--- |
 | **Tên Plugin** | `truyenviet` (Hiển thị: *Truyện Việt*) |
 | **Mục tiêu** | Tìm kiếm, duyệt danh mục, tải về và đọc truyện chữ / truyện tranh trực tiếp từ các website truyện Việt Nam trên máy đọc sách chạy KOReader (Kindle, Kobo, Android, v.v.). |
-| **Phiên bản hiện tại** | Codebase: `v3.8.0` / `3.9.4` (`BUILD-1368`) |
+| **Phiên bản hiện tại** | Codebase: `v3.10.0` (`BUILD-1370`) |
 | **Ngôn ngữ & Runtime** | LuaJIT (tương thích môi trường Lua 5.1/LuaJIT của KOReader) |
 | **Async Engine** | Copas 4.x + LuaSocket + Timerwheel + Binaryheap |
 | **Kho lưu trữ Git** | `https://github.com/magicxlll/Z-Truyenviet.koplugin.git` (nhánh `main`) |
@@ -152,32 +152,58 @@ flowchart TD
 - Môi trường KOReader chạy curl nhúng với cờ `-skSL` để bỏ qua lỗi chứng chỉ SSL cũ trên máy đọc sách cũ.
 - Khi gặp Cloudflare JS challenge, bắt buộc nhận diện chuỗi `window._cf_chl_opt` hoặc `id="challenge-error-text"` để báo lỗi rõ ràng cho người dùng thay vì treo vòng lặp vô tận.
 
+### 4.8. Cơ chế Tải Google Drive: Vượt cảnh báo Virus & Magic Bytes
+- Đối với file > 25MB, Google Drive không trả trực tiếp file nhị phân mà trả về trang HTML cảnh báo virus (`confirm=...` hoặc `download_warning`).
+- **Giải pháp:** Bóc tách token `confirm` từ form HTML hoặc anchor `id="uc-download-link"`, đồng thời lưu trữ và chuyển tiếp `Cookie` (chứa session download) trong request tiếp theo.
+- File Google Drive thường không có tên chuẩn trong Content-Disposition: Tận dụng trích xuất tiêu đề từ `<meta property="og:title">` của trang preview `/file/d/{id}/view`, kết hợp kiểm tra Magic Bytes (`%PDF`, `PK\3\4` EPUB/CBZ, `Rar!` CBR, `BOOKMOBI`) để tự động gán đúng định dạng ebook.
+
 ---
 
 ## 5. Nợ Kỹ thuật & Tồn đọng (Technical Debt)
 
-1. **Bộ Test Suite bị lỗi (Cần sửa gấp):**
-   - `spec/akaytruyen_test.lua`: Lỗi kỳ vọng `@` thay vì `%40` sau URL encoding.
-   - `spec/chapter_downloader_test.lua`: Lỗi `coroutine.yield` trên main thread.
-   - `spec/conduongbachu_test.lua`: Lỗi thứ tự sắp xếp chương 201 và chương 1.
-   - `spec/document_builder_test.lua`: Thiếu mock `cleanChapterHtml` trong mock `helpers`.
-   - `spec/parser_test.lua`: Thiếu mock `socket` do `docln.lua` require ở cấp module.
-   - `spec/reader_test.lua`: Thiếu mock `logger`.
-   - `spec/parser_spec.lua`: Thiếu mock `datastorage`.
-2. **File rác trong Bundle Release:**
-   - File `truyenviet.koplugin/truyenviet/sources/test_aeslua.lua` chứa đường dẫn Windows tĩnh `d:\Project\truyenfull\...` chưa được xóa và đang bị đóng gói vào `truyenviet.koplugin.zip`.
-3. **Module nguyên khối `browser.lua`:**
-   - Hơn 4,200 dòng trong một file duy nhất. Cần tách thành các view riêng: `views/main_menu.lua`, `views/story_detail.lua`, `views/chapter_selector.lua`, `views/settings.lua`.
-4. **Hardcoded GitHub Token trong `error_reporter.lua`:**
-   - Chứa chuỗi token bị đảo ngược (`table.concat(_P):reverse()`) nhắm vào repository của bên thứ ba, tiềm ẩn nguy cơ lộ lọt và lạm dụng API.
-5. **Thư viện AES bị thiếu trong `credential_manager.lua`:**
-   - Code gọi `aeslua` nhưng thư viện này không tồn tại trong source, dẫn tới việc lưu mật khẩu người dùng luôn fallback về thuật toán che giấu XOR yếu (`obf:...`).
-6. **Không tương thích hoàn toàn với Lua 5.4+:**
-   - `generic_source.lua:502`: Gán lại biến lặp `line = Util.trim(line)` bị cấm trong Lua 5.4+ (const variable).
+### Các hạng mục ĐÃ XỬ LÝ TRIỆT ĐỂ (BUILD-1370):
+1. ✅ **Bộ Test Suite hoàn thiện 100% (16/16 test files pass):**
+   - Đã sửa toàn bộ lỗi fail tại: `akaytruyen_test`, `chapter_downloader_test`, `conduongbachu_test`, `document_builder_test`, `parser_test`, `reader_test`, `parser_spec`.
+   - Bổ sung `compile_test.lua` (56/56 file Lua compile thành công) và `gdrive_downloader_test.lua` (20/20 assertions pass).
+2. ✅ **Xóa bỏ File Rác:** Đã xóa bỏ file thừa `truyenviet/sources/test_aeslua.lua`.
+3. ✅ **Tương thích forward với Lua 5.4+:** Đã loại bỏ gán lại biến lặp generic `for` trong `generic_source.lua` và `docln.lua`.
+4. ✅ **An toàn Coroutine:** Toàn bộ lệnh `coroutine.yield` đều được bọc kiểm tra `if coroutine.running()`.
+
+### Các hạng mục Cần Cải tiến Tiếp theo:
+1. **Module nguyên khối `browser.lua`:** Hơn 4,200 dòng trong một file duy nhất. Cần kế hoạch bóc tách dần thành các view module riêng (`views/`).
+2. **Hardcoded GitHub Token trong `error_reporter.lua`:** Cần chuyển sang sử dụng proxy server hoặc GitHub Issue dispatch webhook ẩn danh.
+3. **Thư viện AES trong `credential_manager.lua`:** Cần tích hợp module AES thuần Lua gọn nhẹ nếu muốn mã hóa mạnh mẽ hơn thay cho XOR obfuscation.
 
 ---
 
-## 6. Quy trình Vận hành Chuẩn (Runbook & Workflow)
+## 6. Tính Năng Mới & Nghiên Cứu Mở Rộng (BUILD-1370+)
+
+### 6.1. Tích Hợp Tải Ebook từ Google Drive Công Khai (Đã Hoàn Thành)
+- Module lõi: `truyenviet/gdrive_downloader.lua`.
+- Hỗ trợ toàn bộ định dạng Ebook: `.epub`, `.cbz`, `.cbr`, `.mobi`, `.pdf`, `.azw3`, `.txt`, `.fb2`, `.djvu`.
+- Tích hợp UI hộp thoại nhập link/ID trong Menu chính của `Browser` và Dispatcher action `truyenviet_gdrive_download`.
+- Hỗ trợ nút **"📖 Mở đọc ngay"** sau khi tải xong bằng cách gọi trực tiếp `ReaderUI:showReader(file_path)`.
+
+### 6.2. Nghiên Cứu Kỹ Thuật 3 Phân Hệ Mới (Xem chi tiết tại `docs/FEATURE_RESEARCH_AND_PROPOSAL.md`)
+1. **📰 Đọc báo online (Online News Reader E-ink):**
+   - RSS/Atom XML Feeds tốc độ cao từ 8+ đầu báo lớn (VnExpress, Tuổi Trẻ, Thanh Niên, CafeF...).
+   - Reader View bóc tách bài báo, loại bỏ quảng cáo.
+   - Chế độ **"Chỉ đọc chữ (Text-only)"** siêu nhẹ hoặc **"Tải kèm ảnh (Full Media)"** cho E-ink.
+   - Tính năng **Daily Morning Digest EPUB** (gộp 20 tin nổi bật thành 1 file đọc offline cả ngày).
+2. **📖 Đọc truyện online nâng cao:**
+   - Cú pháp tìm kiếm thông minh: Tìm theo tên truyện hoặc tên truyện kèm số chương (`"Đấu Phá Thương Khung 100"`).
+   - Đồng bộ tiến độ đọc qua Cloud (Google Drive AppData JSON sync).
+   - Kệ sách Quick Shelf Drawer mở nhanh khi đang đọc.
+   - Dual-buffer rolling prefetch giúp chuyển chương tức thì (< 50ms) không gián đoạn mạch đọc.
+3. **☁️ Kết nối Google Drive nâng cao:**
+   - Hỗ trợ **không giới hạn tài khoản** Google Drive (Personal, Shared, Team Drives).
+   - Đăng nhập bảo mật qua **Google OAuth 2.0 Device Flow** (`google.com/device` bằng mã QR/code trên điện thoại, không cần gõ bàn phím trên E-ink).
+   - Duyệt thư mục và tìm kiếm file sách trực tiếp trên giao diện KOReader.
+   - Cơ chế bộ nhớ đệm thông minh LRU giúp giảm tối đa dung lượng bộ nhớ máy (Zero-Storage Footprint).
+
+---
+
+## 7. Quy trình Vận hành Chuẩn (Runbook & Workflow)
 
 ### Quy trình Bắt buộc sau mỗi lần Debug App:
 ```mermaid

@@ -55,4 +55,14 @@ assert(
     )
 )
 
+local found_gdrive = false
+for _, item in ipairs(reader_item.sub_item_table or {}) do
+    if item.text and item.text:find("Google Drive") then
+        found_gdrive = true
+        break
+    end
+end
+assert(found_gdrive, "Google Drive menu item not found in sub_item_table")
+assert(type(Plugin.onTruyenVietGDriveDownload) == "function", "onTruyenVietGDriveDownload handler missing")
+
 print("Main menu tests passed")

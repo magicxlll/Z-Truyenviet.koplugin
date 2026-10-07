@@ -103,6 +103,7 @@ local function loadCustomSources()
 end
 
 local function sortSources()
+    if type(Storage.getSourceOrder) ~= "function" then return end
     local order_list = Storage:getSourceOrder()
     if not order_list or #order_list == 0 then return end
 

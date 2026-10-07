@@ -583,13 +583,16 @@ function Source:getChapter(chapter)
     return self:parseChapter(html, chapter)
 end
 
-local socket = require("socket")
+local ok_sock, socket = pcall(require, "socket")
+if not ok_sock or type(socket) ~= "table" then
+    socket = nil
+end
 local last_request_time = 0
 
 local function applyRateLimit()
     local ok, copas = pcall(require, "copas")
     if ok and copas and copas.sleep then
-        local now = socket.gettime()
+        local now = (socket and socket.gettime and socket.gettime()) or os.time()
         -- DocLN giới hạn rất nghiêm ngặt nếu tải số lượng lớn, cần delay tối thiểu 1.2s
         local next_allowed = last_request_time + 1.2 
         if now < next_allowed then

@@ -44,6 +44,9 @@ package.preload["util"] = function()
         urlEncode = function(value)
             return value:gsub(" ", "+")
         end,
+        stringLower = function(value)
+            return value:lower()
+        end,
     }
 end
 

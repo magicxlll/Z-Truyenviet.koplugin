@@ -309,6 +309,10 @@ function DocumentBuilder:buildComic(source, story, chapter, payload, is_temp)
             error(archive_err)
         end
         
+        if downloaded_count == 0 and #payload.images > 0 then
+            error("Lỗi: Không thể tải hình ảnh hợp lệ của chương truyện tranh")
+        end
+        
         if #failed_images > 0 then
             Debug.write(string.format("DocumentBuilder:buildComic warning: failed %d images", #failed_images))
         end

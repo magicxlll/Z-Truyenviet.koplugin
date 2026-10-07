@@ -68,6 +68,9 @@ package.preload["truyenviet/helpers"] = function()
         escapeHtml = function(value)
             return value
         end,
+        cleanChapterHtml = function(value)
+            return value or ""
+        end,
     }
 end
 

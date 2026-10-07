@@ -189,7 +189,8 @@ end
 function Source:parseStoryPage(html, story)
     local chapters = {}
     local story_url = story.url:gsub("/+$", "")
-    local chapter_prefix = story_url .. "/chapter-"
+    local story_path = story_url:match("https?://[^/]+(/.*)") or story_url
+    local chapter_prefix = story_path .. "/chapter-"
     local chapter_start = html:find('<div class="list-chapters"', 1, true)
     local chapter_html = chapter_start and html:sub(chapter_start) or ""
 
@@ -200,10 +201,12 @@ function Source:parseStoryPage(html, story)
         story.cover_url = Util.absoluteUrl(self.base_url, cover)
     end
 
+    local base_domain = (story.url and story.url:match("^(https?://[^/]+)")) or self.base_url
     for anchor_attrs, anchor_html in chapter_html:gmatch("<a([^>]*)>([%s%S]-)</a>") do
         local href = Util.getAttribute(anchor_attrs, "href")
-        local chapter_url = Util.absoluteUrl(self.base_url, href)
-        if chapter_url and chapter_url:sub(1, #chapter_prefix) == chapter_prefix then
+        local chapter_url = Util.absoluteUrl(base_domain, href)
+        local chapter_path = chapter_url and (chapter_url:match("https?://[^/]+(/.*)") or chapter_url) or ""
+        if chapter_path ~= "" and chapter_path:sub(1, #chapter_prefix) == chapter_prefix then
             local title_html = anchor_html:match("^([%s%S]-)</div>") or anchor_html
             local title = Util.stripTags(title_html)
             table.insert(chapters, {
@@ -244,13 +247,14 @@ function Source:parseChapter(html, chapter)
         return nil, "Không tìm thấy vùng ảnh của chương"
     end
 
+    local base_domain = (chapter and chapter.url and chapter.url:match("^(https?://[^/]+)")) or self.base_url
     local content = html:sub(start_at, (end_at or (#html + 1)) - 1)
     for image_tag in content:gmatch("(<img[^>]*>)") do
         local url = Util.getAttribute(image_tag, "data-img")
             or Util.getAttribute(image_tag, "data-src")
             or Util.getAttribute(image_tag, "src")
         if url and not url:find("^data:", 1, false) then
-            url = Util.absoluteUrl(self.base_url, url)
+            url = Util.absoluteUrl(base_domain, url)
             if url and not url:find("/avatar/") and not url:find("logo") then
                 url = decrypt_dualeo_url(url)
                 table.insert(images, { urls = { url } })

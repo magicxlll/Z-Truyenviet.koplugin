@@ -1,5 +1,7 @@
 local Storage = require("truyenviet/storage")
 local Debug = require("truyenviet/debugger")
+local ok_bit, bit = pcall(require, "bit")
+local bxor = (ok_bit and bit and bit.bxor) or (bit32 and bit32.bxor)
 
 local CredentialManager = {}
 
@@ -44,7 +46,7 @@ function CredentialManager:encrypt(plaintext)
         -- Fallback: simple base64-like obfuscation (not true encryption)
         local result = {}
         for i = 1, #plaintext do
-            result[i] = string.format("%02x", bit32 and bit32.bxor(plaintext:byte(i), 0x5A) or (plaintext:byte(i) + 42) % 256)
+            result[i] = string.format("%02x", bxor and bxor(plaintext:byte(i), 0x5A) or (plaintext:byte(i) + 42) % 256)
         end
         return "obf:" .. table.concat(result)
     end
@@ -64,7 +66,7 @@ function CredentialManager:decrypt(encrypted)
         local result = {}
         for i = 1, #hex, 2 do
             local byte = tonumber(hex:sub(i, i + 1), 16)
-            result[#result + 1] = string.char(bit32 and bit32.bxor(byte, 0x5A) or (byte - 42) % 256)
+            result[#result + 1] = string.char(bxor and bxor(byte, 0x5A) or (byte - 42) % 256)
         end
         return table.concat(result)
     end

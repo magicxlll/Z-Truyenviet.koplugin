@@ -50,7 +50,7 @@ function Util.removeAccents(value)
     for accented, plain in pairs(VIETNAMESE_ASCII) do
         s = s:gsub(accented, plain)
     end
-    return ko_util.stringLower(s)
+    return (ko_util.stringLower and ko_util.stringLower(s)) or s:lower()
 end
 
 function Util.trim(value)

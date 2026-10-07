@@ -443,11 +443,11 @@ local ranked = SearchService:search("pham nhan", {
 assertEqual("Phàm Nhân", ranked[1].title, "Search ranks exact title first")
 assertEqual(8, #Util.stableHash("https://example.com/cover.webp"), "Cover cache hash")
 
-assertEqual(6, #SourceRegistry:listAll(), "Registry keeps six built-in sources")
+assertEqual(21, #SourceRegistry:listAll(), "Registry keeps all built-in sources")
 assertEqual(true, SourceRegistry:isEnabled("dualeo"), "DuaLeo starts enabled")
 assertEqual(true, SourceRegistry:setEnabled("dualeo", false), "DuaLeo can be disabled")
 assertEqual(false, SourceRegistry:isEnabled("dualeo"), "DuaLeo disabled state")
-assertEqual(5, #SourceRegistry:listEnabled(), "Disabled source leaves enabled list")
+assertEqual(20, #SourceRegistry:listEnabled(), "Disabled source leaves enabled list")
 assertEqual(true, SourceRegistry:setEnabled("dualeo", true), "DuaLeo can be enabled again")
 assertEqual(true, SourceRegistry:isEnabled("dualeo"), "DuaLeo enabled state restored")
 
@@ -459,7 +459,7 @@ assertEqual(
 )
 custom_urls.truyenfull = nil
 assertEqual(
-    "https://truyenfull.today",
+    "https://truyenfull.live",
     SourceRegistry:get("truyenfull").base_url,
     "Registry restores default base URL"
 )

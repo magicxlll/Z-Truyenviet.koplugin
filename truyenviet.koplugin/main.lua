@@ -122,6 +122,16 @@ function TruyenViet:onDispatcherRegisterActions()
         filemanager = true,
         plugin = true,
     })
+
+    Dispatcher:registerAction("truyenviet_gdrive_download", {
+        category = "none",
+        event = "TruyenVietGDriveDownload",
+        title = "☁️ Truyện Việt: Tải từ Google Drive",
+        general = true,
+        reader = true,
+        filemanager = true,
+        plugin = true,
+    })
 end
 
 function TruyenViet:addToMainMenu(menu_items)
@@ -174,6 +184,12 @@ function TruyenViet:addToMainMenu(menu_items)
             text = "💾 Đã tải xuống",
             callback = function()
                 self:onTruyenVietDownloaded()
+            end,
+        },
+        {
+            text = "☁️ Tải từ Google Drive",
+            callback = function()
+                self:onTruyenVietGDriveDownload()
             end,
         },
     }
@@ -258,6 +274,12 @@ end
 
 function TruyenViet:onTruyenVietDownloaded()
     Browser:showDownloadedManager(function() Browser:showRoot() end)
+end
+
+function TruyenViet:onTruyenVietGDriveDownload()
+    Browser:showGDriveDownloadDialog(function()
+        Browser:showRoot()
+    end)
 end
 
 
