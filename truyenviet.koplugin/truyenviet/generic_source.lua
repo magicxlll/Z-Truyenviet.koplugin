@@ -499,9 +499,9 @@ function GenericSource.create(schema)
                 if not json_content:find("<p>") then
                     local paragraphs = {}
                     for line in json_content:gmatch("[^\r\n]+") do
-                        line = Util.trim(line)
-                        if #line > 0 then
-                            table.insert(paragraphs, "<p>" .. Util.escapeHtml(line) .. "</p>")
+                        local trimmed = Util.trim(line)
+                        if #trimmed > 0 then
+                            table.insert(paragraphs, "<p>" .. Util.escapeHtml(trimmed) .. "</p>")
                         end
                     end
                     content = table.concat(paragraphs, "\n")

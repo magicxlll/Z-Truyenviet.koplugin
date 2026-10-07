@@ -439,8 +439,8 @@ local function decryptChapterContent(data_k, data_c_json)
     local chunks = {}
     for chunk in data_c_json:gmatch('"([^"]*)"') do
         -- Unescape HTML entities
-        chunk = chunk:gsub("&quot;", '"'):gsub("&amp;", "&"):gsub("&lt;", "<"):gsub("&gt;", ">")
-        table.insert(chunks, chunk)
+        local clean_chunk = chunk:gsub("&quot;", '"'):gsub("&amp;", "&"):gsub("&lt;", "<"):gsub("&gt;", ">")
+        table.insert(chunks, clean_chunk)
     end
 
     if #chunks == 0 then
