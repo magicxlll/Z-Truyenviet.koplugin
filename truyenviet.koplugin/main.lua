@@ -7,13 +7,44 @@ local Version = require("truyenviet/version")
 
 local TruyenViet = WidgetContainer:extend{
     name = "truyenviet",
+    title = "Truyện Việt",
+    fullname = "Truyện Việt",
     is_doc_only = false,
     VERSION = Version,
 }
 
+-- ZenOS and KOReader standard launch methods
+function TruyenViet:onShow()
+    Browser:showRoot()
+end
+
+function TruyenViet:show()
+    Browser:showRoot()
+end
+
+function TruyenViet:open()
+    Browser:showRoot()
+end
+
+function TruyenViet:launch()
+    Browser:showRoot()
+end
+
+function TruyenViet:onOpen()
+    Browser:showRoot()
+end
+
+function TruyenViet:onTruyenviet()
+    Browser:showRoot()
+end
+
 function TruyenViet:init()
     local FontHelper = require("truyenviet/font_helper")
-    FontHelper:setupComicFont()
+    FontHelper:setupFont()
+
+    if self.ui then
+        self.ui.truyenviet = self
+    end
 
     if self.ui.name == "ReaderUI" then
         Reader:initializeFromReaderUI(self.ui)
@@ -49,7 +80,7 @@ function TruyenViet:onDispatcherRegisterActions()
     Dispatcher:registerAction("start_truyenviet", {
         category = "none",
         event = "StartTruyenViet",
-        title = "🔥 Truyện Việt",
+        title = "Truyện Việt",
         general = true,
         reader = true,
         filemanager = true,
@@ -148,7 +179,7 @@ function TruyenViet:onDispatcherRegisterActions()
 end
 
 function TruyenViet:addToMainMenu(menu_items)
-    local title_text = "🔥 Truyện Việt v" .. Version
+    local clean_title = "Truyện Việt"
 
     local sub_items = {
         {
@@ -214,25 +245,37 @@ function TruyenViet:addToMainMenu(menu_items)
     }
 
     menu_items.truyenviet = {
-        text = title_text,
+        text = clean_title,
+        callback = function()
+            self:onStartTruyenViet()
+        end,
         sorting_hint = "tools",
         sub_item_table = sub_items,
     }
 
     if self.ui and self.ui.name == "ReaderUI" then
         menu_items.truyenviet_reader_tools = {
-            text = title_text,
+            text = clean_title,
+            callback = function()
+                self:onStartTruyenViet()
+            end,
             sorting_hint = "tools",
             sub_item_table = sub_items,
         }
     else
         menu_items.truyenviet_search = {
-            text = title_text,
+            text = clean_title,
+            callback = function()
+                self:onStartTruyenViet()
+            end,
             sorting_hint = "search",
             sub_item_table = sub_items,
         }
         menu_items.truyenviet_tools = {
-            text = title_text,
+            text = clean_title,
+            callback = function()
+                self:onStartTruyenViet()
+            end,
             sorting_hint = "tools",
             sub_item_table = sub_items,
         }

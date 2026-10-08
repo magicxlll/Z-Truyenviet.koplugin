@@ -627,17 +627,17 @@ function Browser:showRoot()
             end,
         })
     table.insert(items, {
-        text = "🎨 Cấu hình Font ComicHelvetic Toàn Hệ Thống",
+        text = "🎨 Cấu hình Font Be Vietnam Pro Toàn Hệ Thống",
         callback = function()
             local FontHelper = require("truyenviet/font_helper")
             local installed = FontHelper:isUserPatchInstalled()
             local ConfirmBox = require("ui/widget/confirmbox")
 
             UIManager:show(ConfirmBox:new{
-                title = "Giao diện Font ComicHelvetic",
+                title = "Giao diện Font Be Vietnam Pro",
                 text = installed 
-                    and "Trạng thái: ✅ ĐÃ BẬT User Patch Font ComicHelvetic toàn giao diện KOReader.\n\nBạn có muốn TẮT và gỡ bỏ User Patch này không?"
-                    or "Trạng thái: ❌ CHƯA BẬT User Patch.\n\nKích hoạt User Patch sẽ cài đặt font ComicHelvetic-Light.ttf làm font mặc định cho TOÀN BỘ KOReader (Menu, Popup, Ô văn bản, Tiêu đề).\n\nBạn có muốn BẬT ngay không?",
+                    and "Trạng thái: ✅ ĐÃ BẬT User Patch Font Be Vietnam Pro toàn giao diện KOReader.\n\nBạn có muốn TẮT và gỡ bỏ User Patch này không?"
+                    or "Trạng thái: ❌ CHƯA BẬT User Patch.\n\nKích hoạt User Patch sẽ cài đặt font BeVietnamPro-Regular.ttf làm font mặc định cho TOÀN BỘ KOReader (Menu, Popup, Ô văn bản, Tiêu đề), hiển thị chuẩn 100% tiếng Việt có dấu.\n\nBạn có muốn BẬT ngay không?",
                 ok_text = installed and "Tắt User Patch" or "Bật User Patch",
                 cancel_text = "Hủy",
                 ok_callback = function()
@@ -651,7 +651,7 @@ function Browser:showRoot()
                         if FontHelper:installUserPatch() then
                             UIManager:show(InfoMessage:new{
                                 title = "Truyện Việt",
-                                text = "Đã cài đặt User Patch font thành công!\nVui lòng khởi động lại KOReader để áp dụng font ComicHelvetic toàn giao diện.",
+                                text = "Đã cài đặt User Patch font thành công!\nVui lòng khởi động lại KOReader để áp dụng font Be Vietnam Pro toàn giao diện.",
                             })
                         else
                             showError("Không thể ghi file User Patch vào hệ thống.")
@@ -672,7 +672,8 @@ function Browser:showRoot()
                         "🔥 Truyện Việt cho KOReader v" .. Version,
                         "Đọc truyện trực tuyến mượt mà trên máy đọc sách Kobo/Kindle/Android.",
                         "",
-                        "🔤 Font chữ ComicHelvetic-Light (ComicHelvetic-Light.ttf):",
+                        "🔤 Font chữ Be Vietnam Pro (BeVietnamPro-Regular.ttf):",
+                        "Font chữ thiết kế chuẩn mực cho typography tiếng Việt với đầy đủ dấu thanh.",
                         installed and "-> Trạng thái: ✅ ĐÃ BẬT User Patch Font toàn KOReader." or "-> Trạng thái: ❌ CHƯA BẬT (Dùng tùy chọn bên trên để Bật User Patch toàn KOReader).",
                         "",
                         "Nguồn truyện chữ: TruyenFull, Truyện Dịch AI, AkayTruyen, Con Đường Bá Chủ, v.v.",

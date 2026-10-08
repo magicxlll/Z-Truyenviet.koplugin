@@ -232,9 +232,11 @@ assert_eq(Storage:getIgnoredUpdateVersion(), "3.10.1", "Ignored version saved")
 local orig_http_get = Http.get
 
 -- Case A: Remote has newer version
+local local_ver = require("truyenviet/version")
+local mock_newer = "99.0.0 (BUILD-9999)"
 Http.get = function(_, url)
     if url == Updater.RAW_VERSION_URL then
-        return 'return "3.11.0 (BUILD-1375)"'
+        return 'return "' .. mock_newer .. '"'
     elseif url == Updater.RAW_CHANGELOG_URL then
         return sample_cl
     end
@@ -246,13 +248,13 @@ Updater:checkForUpdate(function(has_up, info, err)
     check_has_update = has_up
     check_info = info
 end)
-assert_eq(check_has_update, true, "Check detects newer version 3.11.0")
-assert_eq(check_info.latest_version, "3.11.0 (BUILD-1375)", "Check info contains new version string")
+assert_eq(check_has_update, true, "Check detects newer version")
+assert_eq(check_info.latest_version, mock_newer, "Check info contains new version string")
 
 -- Case B: Remote has same version
 Http.get = function(_, url)
     if url == Updater.RAW_VERSION_URL then
-        return 'return "3.10.0 (BUILD-1370)"'
+        return 'return "' .. local_ver .. '"'
     end
     return nil
 end

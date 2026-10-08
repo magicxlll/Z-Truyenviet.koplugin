@@ -10,7 +10,7 @@ Tài liệu lưu trữ bộ nhớ dự án, tổng hợp kiến trúc, tình tr�
 | :--- | :--- |
 | **Tên Plugin** | `truyenviet` (Hiển thị: *Truyện Việt*) |
 | **Mục tiêu** | Tìm kiếm, duyệt danh mục, tải về và đọc truyện chữ / truyện tranh trực tiếp từ các website truyện Việt Nam trên máy đọc sách chạy KOReader (Kindle, Kobo, Android, v.v.). |
-| **Phiên bản hiện tại** | Codebase: `v3.11.0` (`BUILD-1372`) |
+| **Phiên bản hiện tại** | Codebase: `v3.12.0` (`BUILD-1375`) |
 | **Ngôn ngữ & Runtime** | LuaJIT (tương thích môi trường Lua 5.1/LuaJIT của KOReader) |
 | **Async Engine** | Copas 4.x + LuaSocket + Timerwheel + Binaryheap |
 | **Kho lưu trữ Git** | `https://github.com/magicxlll/Z-Truyenviet.koplugin.git` (nhánh `main`) |
@@ -164,6 +164,22 @@ flowchart TD
 - **So sánh Phiên bản Ngữ nghĩa (Semantic Versioning):** Không so sánh chuỗi thô (`remote ~= local`), mà bóc tách các thành phần số `major.minor.patch (BUILD-xxxx)` để chỉ kích hoạt thông báo khi phiên bản remote thực sự mới hơn.
 - **Xác thực Gói Cập nhật (ZIP Validation):** Kiểm tra kích thước tối thiểu (>10KB) và Magic Bytes (`PK\3\4`) để ngăn chặn việc giải nén nhầm trang lỗi HTML (như 404/500).
 - **Restart Signal:** Sau khi giải nén đè vào `plugins/`, kích hoạt khởi động lại KOReader qua `Device:restartKOReader()` hoặc gửi tín hiệu thoát chuẩn `os.exit(85)`.
+
+### 4.10. Khuyết Dấu Tiếng Việt trên FreeType / E-ink & Font Be Vietnam Pro
+- **Sự cố:** Font tùy biến cũ `ComicHelvetic-Light.ttf` khi hiển thị tiếng Việt trên KOReader bị khuyết toàn bộ các chữ có dấu phức tạp như `ấ`, `ồ`, `ừ`, `ầ`, `ớ` (chỉ hiển thị khoảng trắng trống trơn, ví dụ: "Tìm trên t  t cả ngu  n", "22 ngu  n").
+- **Nguyên nhân kỹ thuật:** Phân tích cấu trúc bảng TrueType (`loca`, `glyf`) của font `ComicHelvetic` cho thấy: các glyphs dấu tiếng Việt là các composite glyph bị hỏng (byte size chỉ 24 bytes, số đường bao `contours = -1` trỏ vào thành phần rỗng). FreeType khi render không tìm thấy tọa độ nét vẽ nên bỏ qua, biến chữ thành khoảng trắng.
+- **Giải pháp:** Tích hợp bộ font chuẩn **Be Vietnam Pro** (`BeVietnamPro-Regular.ttf` & `BeVietnamPro-Medium.ttf`). Font này do nhóm thiết kế Việt Nam phát triển chuyên biệt cho dấu thanh tiếng Việt, toàn bộ các glyphs `ấ`, `ồ`, `ừ`, `ầ`, `ớ` đều có đầy đủ đường bao vector chuẩn mực (`contours = 2..4`, size 220-330 bytes). Đồng thời `font_helper.lua` tự động phát hiện và nâng cấp các patch cũ từ ComicHelvetic sang Be Vietnam Pro để người dùng không bị kẹt với font hỏng.
+
+### 4.11. Nguyên lý Khám phá & Đăng ký Plugin của ZenOS Launcher (`xZenLabs/zen-os`)
+- **Cơ chế Quét Plugin:** `modules/menu/app_launcher/plugin_scan.lua` của ZenOS tìm kiếm phương thức kích hoạt plugin theo thứ tự:
+  1. `LAUNCH_METHODS = { "onShow", "show", "open", "launch", "onOpen" }`
+  2. Camel-case method: `"on" .. key:sub(1,1):upper() .. key:sub(2)` (ví dụ: `onTruyenviet`)
+  3. `probe_menu_entry(mod, key)` (gọi `mod:addToMainMenu(probe)`) để lấy `entry.callback` (`SENTINEL`) hoặc `entry.sub_item_table` (`SUBMENU`).
+- **Thứ tự sắp xếp Unicode UTF-8:** ZenOS sắp xếp danh sách chọn bằng so sánh chuỗi byte thô `table.sort(out, function(a,b) return a.title < b.title end)`. Nếu tiêu đề bắt đầu bằng emoji (ví dụ `🔥` có byte UTF-8 `0xF0 = 240`), tiêu đề sẽ bị đẩy xuống cuối cùng sau chữ 'Z' và trượt khỏi trang đầu tiên của bộ chọn "Choose plugin menu".
+- **Giải pháp toàn diện:**
+  - Định nghĩa tường minh các phương thức `onShow()`, `show()`, `open()`, `launch()`, `onOpen()`, `onTruyenviet()` trên lớp `TruyenViet` trỏ tới `Browser:showRoot()`.
+  - Chuẩn hóa tiêu đề menu và dispatcher action thành `"Truyện Việt"` gọn gàng, giúp ZenOS sắp xếp chính xác dưới chữ **T** (nằm giữa Terminal và Tweak document settings).
+  - Đăng ký `self.ui.truyenviet = self` trong `init()` để ZenOS phát hiện cả trên ReaderUI lẫn FileManager.
 
 ---
 

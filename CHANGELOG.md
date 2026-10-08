@@ -1,3 +1,19 @@
+## 3.12.0 (BUILD-1375) - 2026-10-08
+
+### Features & Bug Fixes
+- **Chuẩn hóa Font Tiếng Việt với Be Vietnam Pro (Vietnamese Font Standardization)**:
+  - Thay thế toàn bộ font cũ `ComicHelvetic-Light.ttf` (vốn bị lỗi khuyết các glyphs dấu thanh phức tạp như `ấ`, `ồ`, `ừ`, `ầ`, `ớ` hiển thị thành khoảng trắng) bằng font chuẩn tiếng Việt **Be Vietnam Pro** (`BeVietnamPro-Regular.ttf` & `BeVietnamPro-Medium.ttf`).
+  - Cập nhật `truyenviet/font_helper.lua` hỗ trợ sao chép, tự động đăng ký với KOReader `FontList` và cung cấp UI patch hệ thống cho toàn bộ giao diện (Menu, Popup, Ô văn bản, Tiêu đề).
+  - Tự động phát hiện và nâng cấp các User Patch cũ (`patches/2--ui-font.lua`) từ ComicHelvetic sang Be Vietnam Pro, tự động khắc phục triệt để lỗi mất chữ cho người dùng mà không cần thao tác lại.
+  - Cập nhật font nhúng và CSS template trong `document_builder.lua` sang Be Vietnam Pro.
+  - Bổ sung bộ kiểm thử đơn vị `spec/font_helper_test.lua`.
+- **Tích hợp Tương thích Launcher ZenOS (`xZenLabs/zen-os`)**:
+  - Nghiên cứu cơ chế quét plugin của ZenOS Launcher (`modules/menu/app_launcher/plugin_scan.lua`).
+  - Triển khai đầy đủ các phương thức khởi chạy chuẩn (`onShow`, `show`, `open`, `launch`, `onOpen`, `onTruyenviet`) trên lớp `TruyenViet`, cho phép ZenOS Launcher kích hoạt 1-chạm trực tiếp vào màn hình chính của Truyện Việt.
+  - Chuẩn hóa tiêu đề mục menu thành tên gọn gàng `"Truyện Việt"` (loại bỏ emoji `🔥` và đuôi version khỏi tiêu đề menu gốc), giúp ZenOS tự động sắp xếp chính xác theo thứ tự chữ cái dưới chữ **T** (nằm giữa Terminal và Tweak document settings trên Trang 1 của danh sách "Choose plugin menu").
+  - Đăng ký `self.ui.truyenviet = self` trong `TruyenViet:init()` để ZenOS nhận diện phiên bản live instance trong giao diện KOReader.
+  - Bổ sung các bài kiểm thử tự động tương thích ZenOS Launcher trong `spec/main_menu_test.lua`.
+
 ## 3.11.0 (BUILD-1372) - 2026-10-08
 
 ### Features & Improvements

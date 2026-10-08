@@ -83,15 +83,15 @@ function DocumentBuilder:buildText(source, story, chapter, payload, is_temp)
   <title>%s</title>
   <style>
     @font-face {
-      font-family: 'ComicHelvetic-Light';
-      src: url('ComicHelvetic-Light.ttf');
+      font-family: 'BeVietnamPro';
+      src: url('BeVietnamPro-Regular.ttf');
     }
     html, body, article, div {
       margin-left: 0 !important;
       margin-right: 0 !important;
       padding-left: 0 !important;
       padding-right: 0 !important;
-      font-family: 'ComicHelvetic-Light', 'ComicHelvetic', sans-serif !important;
+      font-family: 'BeVietnamPro', 'Be Vietnam Pro', sans-serif !important;
       line-height: 1.6;
       text-align: justify;
       word-wrap: break-word;
