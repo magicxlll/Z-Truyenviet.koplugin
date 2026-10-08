@@ -10,7 +10,7 @@ Tài liệu lưu trữ bộ nhớ dự án, tổng hợp kiến trúc, tình tr�
 | :--- | :--- |
 | **Tên Plugin** | `truyenviet` (Hiển thị: *Truyện Việt*) |
 | **Mục tiêu** | Tìm kiếm, duyệt danh mục, tải về và đọc truyện chữ / truyện tranh trực tiếp từ các website truyện Việt Nam trên máy đọc sách chạy KOReader (Kindle, Kobo, Android, v.v.). |
-| **Phiên bản hiện tại** | Codebase: `v3.10.0` (`BUILD-1370`) |
+| **Phiên bản hiện tại** | Codebase: `v3.11.0` (`BUILD-1372`) |
 | **Ngôn ngữ & Runtime** | LuaJIT (tương thích môi trường Lua 5.1/LuaJIT của KOReader) |
 | **Async Engine** | Copas 4.x + LuaSocket + Timerwheel + Binaryheap |
 | **Kho lưu trữ Git** | `https://github.com/magicxlll/Z-Truyenviet.koplugin.git` (nhánh `main`) |
@@ -43,6 +43,8 @@ flowchart TD
         ChapterOrder["chapter_order.lua"]
         CoverCache["cover_cache.lua (MD5/SHA Hash, Max 10 Prefetch)"]
         Storage["storage.lua (DataStorage wrapper)"]
+        GDrive["gdrive_downloader.lua (Ebook Downloader)"]
+        Updater["updater.lua (OTA Auto-Update Engine)"]
         CredMgr["credential_manager.lua (Tài khoản VIP)"]
         ErrRep["error_reporter.lua (GitHub Issue Bot)"]
         Debugger["debugger.lua (truyenviet-debug.txt)"]
@@ -157,14 +159,20 @@ flowchart TD
 - **Giải pháp:** Bóc tách token `confirm` từ form HTML hoặc anchor `id="uc-download-link"`, đồng thời lưu trữ và chuyển tiếp `Cookie` (chứa session download) trong request tiếp theo.
 - File Google Drive thường không có tên chuẩn trong Content-Disposition: Tận dụng trích xuất tiêu đề từ `<meta property="og:title">` của trang preview `/file/d/{id}/view`, kết hợp kiểm tra Magic Bytes (`%PDF`, `PK\3\4` EPUB/CBZ, `Rar!` CBR, `BOOKMOBI`) để tự động gán đúng định dạng ebook.
 
+### 4.9. Thiết kế Cơ chế Cập nhật OTA An Toàn trên Thiết Bị E-ink
+- **Non-blocking / Background Throttle:** Máy đọc sách E-ink khởi động chậm và kết nối Wi-Fi có độ trễ. Kiểm tra OTA phải hoãn sau khởi động 8 giây (`scheduleIn(8)`), kiểm tra `NetworkMgr:isOnline()` và giới hạn tần suất (mặc định tối đa 1 lần/24h) để tránh spam request hoặc lag màn hình.
+- **So sánh Phiên bản Ngữ nghĩa (Semantic Versioning):** Không so sánh chuỗi thô (`remote ~= local`), mà bóc tách các thành phần số `major.minor.patch (BUILD-xxxx)` để chỉ kích hoạt thông báo khi phiên bản remote thực sự mới hơn.
+- **Xác thực Gói Cập nhật (ZIP Validation):** Kiểm tra kích thước tối thiểu (>10KB) và Magic Bytes (`PK\3\4`) để ngăn chặn việc giải nén nhầm trang lỗi HTML (như 404/500).
+- **Restart Signal:** Sau khi giải nén đè vào `plugins/`, kích hoạt khởi động lại KOReader qua `Device:restartKOReader()` hoặc gửi tín hiệu thoát chuẩn `os.exit(85)`.
+
 ---
 
 ## 5. Nợ Kỹ thuật & Tồn đọng (Technical Debt)
 
-### Các hạng mục ĐÃ XỬ LÝ TRIỆT ĐỂ (BUILD-1370):
-1. ✅ **Bộ Test Suite hoàn thiện 100% (16/16 test files pass):**
+### Các hạng mục ĐÃ XỬ LÝ TRIỆT ĐỂ (BUILD-1370 & BUILD-1372):
+1. ✅ **Bộ Test Suite hoàn thiện 100% (17/17 test files pass):**
    - Đã sửa toàn bộ lỗi fail tại: `akaytruyen_test`, `chapter_downloader_test`, `conduongbachu_test`, `document_builder_test`, `parser_test`, `reader_test`, `parser_spec`.
-   - Bổ sung `compile_test.lua` (56/56 file Lua compile thành công) và `gdrive_downloader_test.lua` (20/20 assertions pass).
+   - Bổ sung `compile_test.lua` (57/57 file Lua compile thành công), `gdrive_downloader_test.lua` (20/20 assertions pass), và `updater_test.lua` (34/34 assertions pass).
 2. ✅ **Xóa bỏ File Rác:** Đã xóa bỏ file thừa `truyenviet/sources/test_aeslua.lua`.
 3. ✅ **Tương thích forward với Lua 5.4+:** Đã loại bỏ gán lại biến lặp generic `for` trong `generic_source.lua` và `docln.lua`.
 4. ✅ **An toàn Coroutine:** Toàn bộ lệnh `coroutine.yield` đều được bọc kiểm tra `if coroutine.running()`.
@@ -184,7 +192,16 @@ flowchart TD
 - Tích hợp UI hộp thoại nhập link/ID trong Menu chính của `Browser` và Dispatcher action `truyenviet_gdrive_download`.
 - Hỗ trợ nút **"📖 Mở đọc ngay"** sau khi tải xong bằng cách gọi trực tiếp `ReaderUI:showReader(file_path)`.
 
-### 6.2. Nghiên Cứu Kỹ Thuật 3 Phân Hệ Mới (Xem chi tiết tại `docs/FEATURE_RESEARCH_AND_PROPOSAL.md`)
+### 6.2. Tự Động Cập Nhật Phiên Bản Mới qua OTA (Đã Hoàn Thành - BUILD-1372)
+- Module lõi: `truyenviet/updater.lua`.
+- Tự động kiểm tra cập nhật chạy ngầm khi khởi động máy mà không làm đơ giao diện.
+- So sánh phiên bản ngữ nghĩa `major.minor.patch (BUILD-xxxx)` chặt chẽ.
+- Tự động bóc tách tóm tắt thay đổi từ `CHANGELOG.md` trên GitHub hiển thị cho người đọc.
+- Xác thực Magic Bytes ZIP và giải nén cài đặt an toàn vào thư mục `plugins`.
+- Hỗ trợ nút khởi động lại KOReader ngay lập tức (`exit code 85`).
+- Tùy biến linh hoạt trong Cài đặt nâng cao: Bật/Tắt tự động kiểm tra, tần suất kiểm tra, và ghi nhớ phiên bản bỏ qua.
+
+### 6.3. Nghiên Cứu Kỹ Thuật 3 Phân Hệ Mới (Xem chi tiết tại `docs/FEATURE_RESEARCH_AND_PROPOSAL.md`)
 1. **📰 Đọc báo online (Online News Reader E-ink):**
    - RSS/Atom XML Feeds tốc độ cao từ 8+ đầu báo lớn (VnExpress, Tuổi Trẻ, Thanh Niên, CafeF...).
    - Reader View bóc tách bài báo, loại bỏ quảng cáo.

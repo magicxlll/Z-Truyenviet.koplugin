@@ -40,6 +40,9 @@ function TruyenViet:init()
     end)
 
     self:onDispatcherRegisterActions()
+
+    local Updater = require("truyenviet/updater")
+    Updater:scheduleBackgroundCheck()
 end
 
 function TruyenViet:onDispatcherRegisterActions()
@@ -132,6 +135,16 @@ function TruyenViet:onDispatcherRegisterActions()
         filemanager = true,
         plugin = true,
     })
+
+    Dispatcher:registerAction("truyenviet_check_update", {
+        category = "none",
+        event = "TruyenVietCheckUpdate",
+        title = "🔄 Truyện Việt: Kiểm tra cập nhật OTA",
+        general = true,
+        reader = true,
+        filemanager = true,
+        plugin = true,
+    })
 end
 
 function TruyenViet:addToMainMenu(menu_items)
@@ -190,6 +203,12 @@ function TruyenViet:addToMainMenu(menu_items)
             text = "☁️ Tải từ Google Drive",
             callback = function()
                 self:onTruyenVietGDriveDownload()
+            end,
+        },
+        {
+            text = "🔄 Kiểm tra cập nhật OTA",
+            callback = function()
+                self:onTruyenVietCheckUpdate()
             end,
         },
     }
@@ -278,6 +297,13 @@ end
 
 function TruyenViet:onTruyenVietGDriveDownload()
     Browser:showGDriveDownloadDialog(function()
+        Browser:showRoot()
+    end)
+end
+
+function TruyenViet:onTruyenVietCheckUpdate()
+    local Updater = require("truyenviet/updater")
+    Updater:checkManually(function()
         Browser:showRoot()
     end)
 end

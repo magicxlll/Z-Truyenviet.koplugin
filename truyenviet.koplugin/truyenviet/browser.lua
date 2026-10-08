@@ -590,138 +590,16 @@ function Browser:showRoot()
             end,
         })
     table.insert(items, {
-            text = "Kiểm tra cập nhật",
-            callback = function()
-                local Http = require("truyenviet/http_client")
-                runOnline(function()
-                    local res, err = withLoading("Đang kiểm tra cập nhật...", function()
-                        -- 1. Ưu tiên kiểm tra raw version.lua từ main branch
-                        local raw_ver = Http:get("https://raw.githubusercontent.com/magicxlll/Z-Truyenviet.koplugin/main/truyenviet.koplugin/truyenviet/version.lua")
-                        if raw_ver then
-                            local remote_v = raw_ver:match('return%s*["\']([^"\']+)["\']')
-                            if remote_v then
-                                return {
-                                    latest_version = remote_v,
-                                    download_url = "https://github.com/magicxlll/Z-Truyenviet.koplugin/raw/main/dist/truyenviet.koplugin.zip"
-                                }
-                            end
-                        end
-
-                        -- 2. Dự phòng kiểm tra qua API tags
-                        local tags_json = Http:get("https://api.github.com/repos/magicxlll/Z-Truyenviet.koplugin/tags")
-                        if tags_json then
-                            local tag_name = tags_json:match('"name"%s*:%s*"([^"]+)"')
-                            if tag_name then
-                                return {
-                                    latest_version = tag_name,
-                                    download_url = "https://github.com/magicxlll/Z-Truyenviet.koplugin/raw/main/dist/truyenviet.koplugin.zip"
-                                }
-                            end
-                        end
-
-                        -- 3. Dự phòng kiểm tra qua releases/latest
-                        local rel_json = Http:get("https://api.github.com/repos/magicxlll/Z-Truyenviet.koplugin/releases/latest")
-                        if rel_json then
-                            local tag_name = rel_json:match('"tag_name"%s*:%s*"([^"]+)"')
-                            local asset_url = rel_json:match('"browser_download_url"%s*:%s*"([^"]+%.zip)"')
-                            if tag_name then
-                                return {
-                                    latest_version = tag_name,
-                                    download_url = asset_url or "https://github.com/magicxlll/Z-Truyenviet.koplugin/raw/main/dist/truyenviet.koplugin.zip"
-                                }
-                            end
-                        end
-
-                        return nil, "Không thể kết nối máy chủ GitHub"
-                    end)
-
-                    if not res then
-                        UIManager:show(ConfirmBox:new{
-                            title = "Truyện Việt",
-                            text = "Lỗi kết nối: " .. tostring(err),
-                            ok_text = "Đóng",
-                        })
-                        return
-                    end
-
-                    local current_version = Version
-                    local latest_version = res.latest_version
-                    local asset_url = res.download_url
-
-                    if latest_version ~= "" and latest_version ~= current_version then
-                        UIManager:show(ConfirmBox:new{
-                            title = "Truyện Việt",
-                            text = string.format("Phiên bản mới: %s\nPhiên bản hiện tại: %s\n\nCó tải về và cài đặt cập nhật không?", latest_version, current_version),
-                            ok_text = "Cập nhật",
-                            ok_callback = function()
-                                UIManager:nextTick(function()
-                                    local dl_ok, dl_err = withLoading("Đang tải xuống bản cập nhật...", function()
-                                        local body, download_err = Http:get(asset_url)
-                                        if not body then
-                                            return nil, download_err
-                                        end
-
-                                        local ffiutil = require("ffi/util")
-                                        local zip_path = ffiutil.joinPath(
-                                            Storage:getRootDir(),
-                                            "update.zip"
-                                        )
-                                        local file, open_err = io.open(zip_path, "wb")
-                                        if not file then
-                                            return nil, open_err or "Không thể lưu file"
-                                        end
-                                        local written, write_err = file:write(body)
-                                        file:close()
-                                        if not written then
-                                            os.remove(zip_path)
-                                            return nil, write_err or "Không thể ghi file"
-                                        end
-
-                                        local DataStorage = require("datastorage")
-                                        local plugins_dir = ffiutil.joinPath(
-                                            DataStorage:getDataDir(),
-                                            "plugins"
-                                        )
-                                        local command = string.format(
-                                            "unzip -o %q -d %q",
-                                            zip_path,
-                                            plugins_dir
-                                        )
-                                        local status = os.execute(command)
-                                        os.remove(zip_path)
-                                        if status ~= 0 and status ~= true then
-                                            return nil, "Không thể giải nén bản cập nhật"
-                                        end
-                                        return true
-                                    end)
-
-                                    if dl_ok then
-                                        UIManager:show(ConfirmBox:new{
-                                            title = "Truyện Việt",
-                                            text = "Cập nhật thành công! Vui lòng khởi động lại KOReader.",
-                                            ok_text = "Đóng",
-                                        })
-                                    else
-                                        UIManager:show(ConfirmBox:new{
-                                            title = "Truyện Việt",
-                                            text = "Cập nhật thất bại: " .. tostring(dl_err),
-                                            ok_text = "Đóng",
-                                        })
-                                    end
-                                end)
-                            end,
-                            cancel_text = "Để sau",
-                        })
-                    else
-                        UIManager:show(ConfirmBox:new{
-                            title = "Truyện Việt",
-                            text = "Bạn đang dùng phiên bản mới nhất (" .. current_version .. ")",
-                            ok_text = "Đóng",
-                        })
-                    end
+        text = "🔄 Kiểm tra cập nhật OTA",
+        callback = function()
+            closeAndRun(view, function()
+                local Updater = require("truyenviet/updater")
+                Updater:checkManually(function()
+                    self:showRoot()
                 end)
-            end,
-        })
+            end)
+        end,
+    })
     table.insert(items, {
         text = "Gửi báo lỗi / Xem log",
         callback = function()
@@ -4328,6 +4206,44 @@ function Browser:showAdvancedSettings(on_return)
             end)
         end,
     })
+
+    -- Cài đặt OTA Updates
+    local ota_status = Storage:isAutoUpdateCheckEnabled() and "ĐANG BẬT" or "ĐÃ TẮT"
+    table.insert(items, {
+        text = "Tự động kiểm tra cập nhật OTA: [" .. ota_status .. "]",
+        callback = function()
+            Storage:setAutoUpdateCheckEnabled(not Storage:isAutoUpdateCheckEnabled())
+            self:showAdvancedSettings(on_return)
+        end,
+    })
+
+    local freq = Storage:getUpdateCheckFrequency()
+    local freq_text = (freq == 0 and "Mỗi khi khởi động")
+        or (freq <= 86400 and "Mỗi 24 giờ")
+        or "Mỗi 7 ngày"
+    table.insert(items, {
+        text = "Tần suất tự động kiểm tra OTA: [" .. freq_text .. "]",
+        callback = function()
+            local next_freq = (freq == 86400 and 604800) or (freq == 604800 and 0) or 86400
+            Storage:setUpdateCheckFrequency(next_freq)
+            self:showAdvancedSettings(on_return)
+        end,
+    })
+
+    local ignored = Storage:getIgnoredUpdateVersion()
+    if ignored and ignored ~= "" then
+        table.insert(items, {
+            text = "Xóa phiên bản bỏ qua: [" .. ignored .. "]",
+            callback = function()
+                Storage:setIgnoredUpdateVersion("")
+                UIManager:show(InfoMessage:new{
+                    title = "Truyện Việt",
+                    text = "Đã xóa phiên bản bị bỏ qua.",
+                })
+                self:showAdvancedSettings(on_return)
+            end,
+        })
+    end
 
     local view = ListView:new{
         title = "Cài đặt Nâng cao & Tải ngầm",

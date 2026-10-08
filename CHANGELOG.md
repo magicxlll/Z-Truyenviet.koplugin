@@ -1,3 +1,17 @@
+## 3.11.0 (BUILD-1372) - 2026-10-08
+
+### Features & Improvements
+- **Tự động Cập nhật Phiên bản mới qua OTA (Automatic OTA Updates)**:
+  - Bổ sung module chuyên biệt `truyenviet/updater.lua` quản lý toàn diện quy trình kiểm tra, so sánh phiên bản ngữ nghĩa (semantic versioning), tải về và giải nén cài đặt bản cập nhật OTA.
+  - Tự động kiểm tra bản cập nhật ngầm khi khởi động plugin (sau 8s khi hệ thống mạng ổn định, không chặn UI).
+  - So sánh phiên bản chặt chẽ theo `major.minor.patch (BUILD-xxxx)`, chỉ gợi ý nâng cấp khi phiên bản từ GitHub thực sự mới hơn.
+  - Tự động trích xuất tóm tắt nhật ký thay đổi (`CHANGELOG.md`) từ máy chủ để hiển thị nội dung cập nhật mới cho người dùng trước khi xác nhận tải.
+  - Kiểm tra tính toàn vẹn gói cập nhật ZIP (kích thước tối thiểu và Magic Bytes `PK\3\4`), giải nén trực tiếp vào thư mục `plugins` của KOReader với cơ chế dự phòng `busybox unzip`.
+  - Hỗ trợ khởi động lại KOReader ngay lập tức (`restartKOReader`) sau khi cập nhật thành công.
+  - Tích hợp cấu hình linh hoạt trong Cài đặt nâng cao: Bật/Tắt tự động kiểm tra OTA, tùy chọn tần suất kiểm tra (mỗi lần mở / mỗi 24 giờ / mỗi tuần), và ghi nhớ phiên bản bỏ qua.
+  - Đăng ký Dispatcher Action `truyenviet_check_update` và menu kiểm tra thủ công trong Menu chính.
+  - Bổ sung bộ kiểm thử đơn vị `spec/updater_test.lua` với 34 assertions.
+
 ## 3.10.0 (BUILD-1370) - 2026-10-07
 
 ### Features & Improvements

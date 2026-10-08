@@ -437,6 +437,48 @@ function Storage:setPurgeDistance(distance)
     return persistSetting(self, "purge_distance", tonumber(distance) or 5)
 end
 
+-- ============ Quản lý Cập nhật OTA (OTA Update Settings) ============
+
+function Storage:isAutoUpdateCheckEnabled()
+    self:initialize()
+    return self.settings:readSetting("ota_auto_check", true) == true
+end
+
+function Storage:setAutoUpdateCheckEnabled(enabled)
+    self:initialize()
+    return persistSetting(self, "ota_auto_check", enabled == true)
+end
+
+function Storage:getLastUpdateCheckTime()
+    self:initialize()
+    return tonumber(self.settings:readSetting("ota_last_check_time", 0)) or 0
+end
+
+function Storage:setLastUpdateCheckTime(timestamp)
+    self:initialize()
+    return persistSetting(self, "ota_last_check_time", tonumber(timestamp) or os.time())
+end
+
+function Storage:getUpdateCheckFrequency()
+    self:initialize()
+    return tonumber(self.settings:readSetting("ota_check_frequency", 86400)) or 86400
+end
+
+function Storage:setUpdateCheckFrequency(freq)
+    self:initialize()
+    return persistSetting(self, "ota_check_frequency", tonumber(freq) or 86400)
+end
+
+function Storage:getIgnoredUpdateVersion()
+    self:initialize()
+    return self.settings:readSetting("ota_ignored_version", "")
+end
+
+function Storage:setIgnoredUpdateVersion(ver)
+    self:initialize()
+    return persistSetting(self, "ota_ignored_version", tostring(ver or ""))
+end
+
 -- Quản lý File Đã Tải (Downloaded Files Management)
 
 function Storage:listDownloadedStories()
